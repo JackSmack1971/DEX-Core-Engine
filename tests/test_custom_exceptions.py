@@ -1,4 +1,12 @@
 import os
+os.environ.setdefault("RPC_URL", "http://localhost")
+os.environ.setdefault("PRIVATE_KEY", "key")
+os.environ.setdefault("WALLET_ADDRESS", "addr")
+os.environ.setdefault("TOKEN0_ADDRESS", "0x0000000000000000000000000000000000000001")
+os.environ.setdefault("TOKEN1_ADDRESS", "0x0000000000000000000000000000000000000002")
+os.environ.setdefault("UNISWAP_V2_ROUTER", "0x0000000000000000000000000000000000000003")
+os.environ.setdefault("SUSHISWAP_ROUTER", "0x0000000000000000000000000000000000000004")
+
 from unittest.mock import MagicMock
 
 import pytest
@@ -7,10 +15,6 @@ from exceptions import DexError, StrategyError
 from dex_handler import DEXHandler
 from web3_service import TransactionFailedError
 from strategy import ArbitrageStrategy
-
-os.environ.setdefault("RPC_URL", "http://localhost")
-os.environ.setdefault("PRIVATE_KEY", "key")
-os.environ.setdefault("WALLET_ADDRESS", "addr")
 
 
 def test_strategy_error_raised():
