@@ -14,14 +14,21 @@ from typing import Any, Dict, List, Optional
 
 from web3 import Web3, HTTPProvider
 from web3.contract import Contract
-from web3.middleware import geth_poa_middleware
+try:
+    from web3.middleware import geth_poa_middleware
+except ImportError:  # web3 v7
+    from web3.middleware.proof_of_authority import ExtraDataToPOAMiddleware as geth_poa_middleware
 from web3.types import TxParams, TxReceipt
-
-import config
+from web3.exceptions import TimeExhausted
 
 
 class TransactionFailedError(Exception):
     """Custom exception for failed on-chain transactions."""
+    pass
+
+
+class TransactionTimeoutError(Exception):
+    """Raised when a transaction does not get mined within the expected time."""
     pass
 
 
@@ -61,35 +68,26 @@ class Web3Service:
         return self.web3.eth.contract(address=checksum_address, abi=abi)
 
     def sign_and_send_transaction(
-        self,
-        transaction: TxParams
+        self, transaction: TxParams, timeout: int = 120, retries: int = 3
     ) -> TxReceipt:
-        """
-        Signs and sends a transaction, waiting for its receipt.
-
-        Args:
-            transaction: The transaction dictionary to be sent.
-
-        Returns:
-            The receipt of the successfully mined transaction.
-
-        Raises:
-            TransactionFailedError: If the transaction fails on-chain.
-            ValueError: If required transaction parameters are missing.
-        """
+        """Sign and send a transaction with retry and timeout logic."""
         if "nonce" not in transaction:
-            transaction["nonce"] = self.web3.eth.get_transaction_count(
-                self.account.address
-            )
+            transaction["nonce"] = self.web3.eth.get_transaction_count(self.account.address)
 
-        signed_txn = self.web3.eth.account.sign_transaction(
-            transaction, self.account.key
-        )
-        tx_hash = self.web3.eth.send_raw_transaction(signed_txn.rawTransaction)
-        receipt = self.web3.eth.wait_for_transaction_receipt(tx_hash)
-
-        if receipt["status"] == 0:
-            raise TransactionFailedError(
-                f"Transaction {tx_hash.hex()} failed."
-            )
-        return receipt
+        for attempt in range(retries):
+            signed = self.web3.eth.account.sign_transaction(transaction, self.account.key)
+            tx_hash = self.web3.eth.send_raw_transaction(signed.rawTransaction)
+            try:
+                receipt = self.web3.eth.wait_for_transaction_receipt(tx_hash, timeout=timeout)
+            except TimeExhausted:
+                if attempt == retries - 1:
+                    raise TransactionTimeoutError(f"Transaction {tx_hash.hex()} timed out")
+                time.sleep(1)
+                transaction["nonce"] = self.web3.eth.get_transaction_count(self.account.address)
+                continue
+            if receipt["status"] == 0:
+                raise TransactionFailedError(
+                    f"Transaction {tx_hash.hex()} failed."
+                )
+            return receipt
+        raise TransactionTimeoutError("Max retries exceeded")  # pragma: no cover
