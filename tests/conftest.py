@@ -15,3 +15,8 @@ os.environ.setdefault("TOKEN0_ADDRESS", "0x0000000000000000000000000000000000000
 os.environ.setdefault("TOKEN1_ADDRESS", "0x0000000000000000000000000000000000000002")
 os.environ.setdefault("UNISWAP_V2_ROUTER", "0x0000000000000000000000000000000000000003")
 os.environ.setdefault("SUSHISWAP_ROUTER", "0x0000000000000000000000000000000000000004")
+os.environ.setdefault("MAX_POSITION_SIZE", "1.0")
+os.environ.setdefault("RISK_LIMIT", "0.01")
+os.environ.setdefault("MAX_DAILY_VOLUME", "100.0")
+os.environ.setdefault("GAS_LIMIT", "250000")
+os.environ.setdefault("TX_TIMEOUT", "120")

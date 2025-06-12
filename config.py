@@ -1,105 +1,179 @@
-# config.py
-# /usr/bin/env python3
+"""Application configuration management."""
 
-"""
-Configuration loader for the Ethereum Trading Bot.
-
-Manages loading and validation of essential configuration parameters
-from environment variables.
-"""
+from __future__ import annotations
 
 import os
-from typing import Final, List
+from pathlib import Path
+from typing import Any, Dict
 
+from dotenv import load_dotenv
+from pydantic import BaseModel, Field, ValidationError, validator
 from web3 import Web3
 
 from exceptions import ConfigurationError
 
-from dotenv import load_dotenv
 
-# --- Load environment variables from .env file ---
-load_dotenv()
+class TradingSettings(BaseModel):
+    """Trading related parameters."""
 
-
-def _load_address(var_name: str) -> str:
-    """Load and validate an Ethereum address from the environment."""
-    address = os.getenv(var_name, "").strip()
-    if not address:
-        raise ConfigurationError(f"{var_name} environment variable not set.")
-    if not Web3.isAddress(address):
-        raise ConfigurationError(f"{var_name} is not a valid Ethereum address.")
-    return Web3.toChecksumAddress(address)
+    max_position_size: float = Field(..., gt=0)
+    risk_limit: float = Field(..., ge=0, le=1)
+    max_daily_volume: float = Field(100.0, gt=0)
 
 
-def _load_float(var_name: str, default: float, *, minimum: float, maximum: float) -> float:
-    """Load a float from the environment with range validation."""
-    value_str = os.getenv(var_name, str(default))
-    try:
-        value = float(value_str)
-    except ValueError as exc:
-        raise ConfigurationError(f"{var_name} must be a number.") from exc
-    if not minimum <= value <= maximum:
-        raise ConfigurationError(
-            f"{var_name} must be between {minimum} and {maximum}."
-        )
-    return value
+class DexSettings(BaseModel):
+    """DEX related parameters."""
+
+    gas_limit: int = Field(..., gt=21_000)
+    tx_timeout: int = Field(..., gt=0)
 
 
-def _load_int(var_name: str, default: int, *, minimum: int, maximum: int) -> int:
-    """Load an int from the environment with range validation."""
-    value_str = os.getenv(var_name, str(default))
-    try:
-        value = int(value_str)
-    except ValueError as exc:
-        raise ConfigurationError(f"{var_name} must be an integer.") from exc
-    if not minimum <= value <= maximum:
-        raise ConfigurationError(
-            f"{var_name} must be between {minimum} and {maximum}."
-        )
-    return value
+class AppConfig(BaseModel):
+    """Validated application configuration."""
+
+    rpc_url: str
+    private_key: str
+    wallet_address: str
+    token0_address: str
+    token1_address: str
+    uniswap_v2_router: str
+    sushiswap_router: str
+    profit_threshold: float = Field(1.0, ge=0)
+    poll_interval_seconds: int = Field(10, gt=0)
+    slippage_tolerance_percent: float = Field(0.5, ge=0, le=100)
+    trading: TradingSettings
+    dex: DexSettings
+
+    @validator(
+        "wallet_address",
+        "token0_address",
+        "token1_address",
+        "uniswap_v2_router",
+        "sushiswap_router",
+    )
+    def check_address(cls, value: str) -> str:  # noqa: D417
+        if not Web3.is_address(value):
+            raise ValueError("invalid address")
+        return Web3.to_checksum_address(value)
 
 
-# --- Security & Connection Configuration ---
-# A secure RPC URL from a provider like Infura or Alchemy is required.
-# Example: "https://mainnet.infura.io/v3/YOUR_INFURA_PROJECT_ID"
-RPC_URL: Final[str] = os.getenv("RPC_URL", "")
-if not RPC_URL:
-    raise ConfigurationError("RPC_URL environment variable not set.")
+class ConfigManager:
+    """Loads and validates configuration with reload capability."""
 
-# The private key of the trading wallet.
-# WARNING: Keep this key secure and never expose it.
-PRIVATE_KEY: Final[str] = os.getenv("PRIVATE_KEY", "")
-if not PRIVATE_KEY:
-    raise ConfigurationError("PRIVATE_KEY environment variable not set.")
+    def __init__(self, env: str | None = None) -> None:
+        self.env = env or os.getenv("APP_ENV", "dev")
+        self._config = self._build_config()
+        _update_globals(self._config)
 
-# The public address of the trading wallet.
-WALLET_ADDRESS: Final[str] = _load_address("WALLET_ADDRESS")
+    def _load_env_file(self) -> None:
+        for file in (f".env.{self.env}", ".env"):
+            path = Path(file)
+            if path.is_file():
+                load_dotenv(path, override=False)
 
-# --- Trading Pair Configuration ---
-# Addresses of the tokens to be traded.
-# Values must be provided via environment variables.
-TOKEN0_ADDRESS: Final[str] = _load_address("TOKEN0_ADDRESS")
-TOKEN1_ADDRESS: Final[str] = _load_address("TOKEN1_ADDRESS")
+    def _env(self, key: str) -> str:
+        value = os.getenv(key, "").strip()
+        if not value:
+            raise ConfigurationError(f"{key} environment variable not set")
+        return value
 
-# --- DEX Configuration ---
-# Contract addresses for Uniswap V2 and Sushiswap Routers.
-UNISWAP_V2_ROUTER: Final[str] = _load_address("UNISWAP_V2_ROUTER")
-SUSHISWAP_ROUTER: Final[str] = _load_address("SUSHISWAP_ROUTER")
+    def _build_dict(self) -> Dict[str, Any]:
+        self._load_env_file()
+        return {
+            "rpc_url": self._env("RPC_URL"),
+            "private_key": self._env("PRIVATE_KEY"),
+            "wallet_address": self._env("WALLET_ADDRESS"),
+            "token0_address": self._env("TOKEN0_ADDRESS"),
+            "token1_address": self._env("TOKEN1_ADDRESS"),
+            "uniswap_v2_router": self._env("UNISWAP_V2_ROUTER"),
+            "sushiswap_router": self._env("SUSHISWAP_ROUTER"),
+            "profit_threshold": float(os.getenv("PROFIT_THRESHOLD", 1.0)),
+            "poll_interval_seconds": int(os.getenv("POLL_INTERVAL_SECONDS", 10)),
+            "slippage_tolerance_percent": float(
+                os.getenv("SLIPPAGE_TOLERANCE_PERCENT", 0.5)
+            ),
+            "trading": {
+                "max_position_size": float(os.getenv("MAX_POSITION_SIZE", 1.0)),
+                "risk_limit": float(os.getenv("RISK_LIMIT", 0.01)),
+                "max_daily_volume": float(os.getenv("MAX_DAILY_VOLUME", 100.0)),
+            },
+            "dex": {
+                "gas_limit": int(os.getenv("GAS_LIMIT", 250_000)),
+                "tx_timeout": int(os.getenv("TX_TIMEOUT", 120)),
+            },
+        }
 
-DEX_ROUTERS: Final[List[str]] = [UNISWAP_V2_ROUTER, SUSHISWAP_ROUTER]
+    def _build_config(self) -> AppConfig:
+        try:
+            return AppConfig(**self._build_dict())
+        except ValidationError as exc:
+            raise ConfigurationError(str(exc)) from exc
 
-# --- Bot Operational Parameters ---
-# The minimum profit threshold in TOKEN1 (e.g., DAI) to execute a trade.
-PROFIT_THRESHOLD: Final[float] = _load_float(
-    "PROFIT_THRESHOLD", 1.0, minimum=0.0, maximum=1000.0
-)
+    @property
+    def config(self) -> AppConfig:
+        return self._config
 
-# Time in seconds to wait between polling for prices.
-POLL_INTERVAL_SECONDS: Final[int] = _load_int(
-    "POLL_INTERVAL_SECONDS", 10, minimum=1, maximum=3600
-)
+    def reload(self) -> AppConfig:
+        self._config = self._build_config()
+        _update_globals(self._config)
+        return self._config
 
-# Maximum acceptable slippage for trades, in percentage.
-SLIPPAGE_TOLERANCE_PERCENT: Final[float] = _load_float(
-    "SLIPPAGE_TOLERANCE_PERCENT", 0.5, minimum=0.0, maximum=100.0
-)
+
+def _update_globals(cfg: AppConfig) -> None:
+    mapping = {
+        "RPC_URL": cfg.rpc_url,
+        "PRIVATE_KEY": cfg.private_key,
+        "WALLET_ADDRESS": cfg.wallet_address,
+        "TOKEN0_ADDRESS": cfg.token0_address,
+        "TOKEN1_ADDRESS": cfg.token1_address,
+        "UNISWAP_V2_ROUTER": cfg.uniswap_v2_router,
+        "SUSHISWAP_ROUTER": cfg.sushiswap_router,
+        "PROFIT_THRESHOLD": cfg.profit_threshold,
+        "POLL_INTERVAL_SECONDS": cfg.poll_interval_seconds,
+        "SLIPPAGE_TOLERANCE_PERCENT": cfg.slippage_tolerance_percent,
+        "MAX_POSITION_SIZE": cfg.trading.max_position_size,
+        "RISK_LIMIT": cfg.trading.risk_limit,
+        "MAX_DAILY_VOLUME": cfg.trading.max_daily_volume,
+        "GAS_LIMIT": cfg.dex.gas_limit,
+        "TX_TIMEOUT": cfg.dex.tx_timeout,
+    }
+    globals().update(mapping)
+
+
+CONFIG_MANAGER = ConfigManager()
+
+cfg = CONFIG_MANAGER.config
+RPC_URL = cfg.rpc_url
+PRIVATE_KEY = cfg.private_key
+WALLET_ADDRESS = cfg.wallet_address
+TOKEN0_ADDRESS = cfg.token0_address
+TOKEN1_ADDRESS = cfg.token1_address
+UNISWAP_V2_ROUTER = cfg.uniswap_v2_router
+SUSHISWAP_ROUTER = cfg.sushiswap_router
+PROFIT_THRESHOLD = cfg.profit_threshold
+POLL_INTERVAL_SECONDS = cfg.poll_interval_seconds
+SLIPPAGE_TOLERANCE_PERCENT = cfg.slippage_tolerance_percent
+MAX_POSITION_SIZE = cfg.trading.max_position_size
+RISK_LIMIT = cfg.trading.risk_limit
+MAX_DAILY_VOLUME = cfg.trading.max_daily_volume
+GAS_LIMIT = cfg.dex.gas_limit
+TX_TIMEOUT = cfg.dex.tx_timeout
+
+__all__ = [
+    "CONFIG_MANAGER",
+    "RPC_URL",
+    "PRIVATE_KEY",
+    "WALLET_ADDRESS",
+    "TOKEN0_ADDRESS",
+    "TOKEN1_ADDRESS",
+    "UNISWAP_V2_ROUTER",
+    "SUSHISWAP_ROUTER",
+    "PROFIT_THRESHOLD",
+    "POLL_INTERVAL_SECONDS",
+    "SLIPPAGE_TOLERANCE_PERCENT",
+    "MAX_POSITION_SIZE",
+    "RISK_LIMIT",
+    "MAX_DAILY_VOLUME",
+    "GAS_LIMIT",
+    "TX_TIMEOUT",
+]
