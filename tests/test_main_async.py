@@ -26,8 +26,11 @@ def test_main_runs(monkeypatch):
     monkeypatch.setattr(main, "ArbitrageStrategy", MagicMock(return_value=strategy))
 
     def fake_run(coro):
-        loop = asyncio.get_event_loop()
-        return loop.run_until_complete(coro)
+        loop = asyncio.new_event_loop()
+        try:
+            return loop.run_until_complete(coro)
+        finally:
+            loop.close()
 
     monkeypatch.setattr(main, "asyncio", MagicMock(run=fake_run))
 

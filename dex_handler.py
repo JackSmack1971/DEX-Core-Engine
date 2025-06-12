@@ -9,14 +9,20 @@ swaps on DEXs that follow the Uniswap V2 protocol.
 
 import time
 import asyncio
-from typing import List, Dict, Any, Final
+from typing import Any, Dict, Final, List
 
 from web3.contract import Contract
 from web3.exceptions import ContractLogicError
 
 import config
-from web3_service import Web3Service, TransactionFailedError, TransactionTimeoutError
-from exceptions import DexError
+from web3_service import (
+    Web3Service,
+    TransactionFailedError,
+    TransactionTimeoutError,
+)
+from exceptions import DexError, ServiceUnavailableError
+from utils.circuit_breaker import CircuitBreaker
+from utils.retry import retry_async
 from logger import logger
 
 # A minimal ABI for the Uniswap V2 Router is sufficient for our needs.
@@ -66,70 +72,75 @@ class DEXHandler:
         self.contract: Contract = web3_service.get_contract(
             router_address, UNISWAP_V2_ROUTER_ABI
         )
+        self._circuit = CircuitBreaker()
+
+    async def _query_price(
+        self, token_in_address: str, token_out_address: str, amount_in: int
+    ) -> float:
+        path = [token_in_address, token_out_address]
+        amounts_out = await asyncio.to_thread(
+            self.contract.functions.getAmountsOut(amount_in, path).call
+        )
+        return amounts_out[1] / (10**18)
 
     async def get_price(
         self,
         token_in_address: str,
         token_out_address: str,
-        amount_in: int = 10**18  # Default to 1 ETH/WETH
+        amount_in: int = 10**18,
     ) -> float:
-        """
-        Gets the current price for a token pair.
-
-        Args:
-            token_in_address: Address of the input token.
-            token_out_address: Address of the output token.
-            amount_in: The amount of input token to query the price for.
-
-        Returns:
-            The amount of output tokens received for the input amount,
-            or 0.0 if the query fails.
-        """
+        """Get price with circuit breaker and retry logic."""
         try:
-            path = [token_in_address, token_out_address]
-            amounts_out = await asyncio.to_thread(
-                self.contract.functions.getAmountsOut(amount_in, path).call
+            return await self._circuit.call(
+                retry_async,
+                self._query_price,
+                token_in_address,
+                token_out_address,
+                amount_in,
             )
-            # Assuming the output token has 18 decimals, a common standard
-            return amounts_out[1] / (10**18)
+        except ServiceUnavailableError as exc:
+            logger.error("Price circuit open: %s", exc)
+            return 0.0
         except (ContractLogicError, ValueError) as exc:
             logger.warning("Price query failed: %s", exc)
             return 0.0
 
-    def execute_swap(
-        self,
-        amount_in_wei: int,
-        path: List[str]
-    ) -> str:
-        """
-        Executes a swap from ETH to a specified token.
-
-        Args:
-            amount_in_wei: The amount of ETH (in Wei) to swap.
-            path: The token swap path, starting with WETH.
-
-        Returns:
-            The transaction hash of the executed swap.
-        """
-        amount_out_min = 0  # For simplicity; a real bot should calculate this
+    async def _do_swap(self, amount_in_wei: int, path: List[str]) -> str:
+        amount_out_min = 0
         to_address = self.web3_service.account.address
-        deadline = int(time.time()) + 60 * 5  # 5 minutes from now
-
+        deadline = int(time.time()) + 60 * 5
         tx_params = self.contract.functions.swapExactETHForTokens(
             amount_out_min,
             path,
             to_address,
-            deadline
-        ).build_transaction({
-            'from': to_address,
-            'value': amount_in_wei,
-            'gas': 250000, # Set a reasonable gas limit
-            'gasPrice': self.web3_service.web3.eth.gas_price
-        })
+            deadline,
+        ).build_transaction(
+            {
+                "from": to_address,
+                "value": amount_in_wei,
+                "gas": 250000,
+                "gasPrice": self.web3_service.web3.eth.gas_price,
+            }
+        )
+        receipt = self.web3_service.sign_and_send_transaction(tx_params)
+        return receipt["transactionHash"].hex()
 
+    async def execute_swap(
+        self,
+        amount_in_wei: int,
+        path: List[str]
+    ) -> str:
+        """Execute swap with circuit breaker and retry logic."""
         try:
-            receipt = self.web3_service.sign_and_send_transaction(tx_params)
-            return receipt['transactionHash'].hex()
+            return await self._circuit.call(
+                retry_async,
+                self._do_swap,
+                amount_in_wei,
+                path,
+            )
+        except ServiceUnavailableError as exc:
+            logger.error("Swap circuit open: %s", exc)
+            raise DexError("service unavailable") from exc
         except (TransactionFailedError, TransactionTimeoutError) as exc:
             logger.error("Swap execution failed: %s", exc)
             raise DexError(str(exc)) from exc

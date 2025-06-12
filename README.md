@@ -118,9 +118,16 @@ DEX handlers initialized.
 Monitoring WETH / DAI pair. 
 DEX 1 Router: 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D 
 DEX 2 Router: 0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F ---------------------------------------- 
-Price DEX1: 3450.12 DAI | Price DEX2: 3451.50 DAI | Margin: 1.38 DAI 
+Price DEX1: 3450.12 DAI | Price DEX2: 3451.50 DAI | Margin: 1.38 DAI
 No profitable opportunity found. Standing by. Waiting for 10 seconds...
 ```
+
+## Resilience & Health Checks
+
+The project includes a small FastAPI application exposing `/health` and `/ready`
+endpoints with request rate limiting. DEX interactions are guarded by a circuit
+breaker and all blockchain calls use exponential backoff to handle transient
+failures.
 
 🧩 How to Extend the Bot
 The modular design makes it easy to add new strategies. To create your own:

@@ -15,13 +15,14 @@ from web3_service import Web3Service
 from dex_handler import DEXHandler
 from strategy import ArbitrageStrategy
 from exceptions import ConfigurationError, DexError, StrategyError
-from logger import logger
+from logger import logger, set_correlation_id
 
 
 def main() -> None:
     """
     Sets up and runs the trading bot.
     """
+    set_correlation_id()
     logger.info("Initializing Ethereum Trading Bot...")
 
     try:
