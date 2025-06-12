@@ -10,6 +10,8 @@ trading opportunities based on market conditions.
 import asyncio
 from typing import List
 
+from risk_manager import RiskManager
+
 import config
 from dex_handler import DEXHandler
 from exceptions import StrategyError
@@ -27,7 +29,7 @@ class ArbitrageStrategy:
     opportunity is identified.
     """
 
-    def __init__(self, dex_handlers: List[DEXHandler]):
+    def __init__(self, dex_handlers: List[DEXHandler], risk_manager: RiskManager | None = None):
         """
         Initializes the arbitrage strategy.
 
@@ -40,6 +42,7 @@ class ArbitrageStrategy:
         self.dex2 = dex_handlers[1]
         self.token0 = config.TOKEN0_ADDRESS  # e.g., WETH
         self.token1 = config.TOKEN1_ADDRESS  # e.g., DAI
+        self.risk = risk_manager or RiskManager()
 
     def _check_profitability(self, price1: float, price2: float) -> None:
         """
@@ -66,8 +69,9 @@ class ArbitrageStrategy:
 
         if profit_margin > (estimated_gas_cost_in_dai + config.PROFIT_THRESHOLD):
             logger.info("Profitable opportunity found! Margin: $%.2f", profit_margin)
-            # In a real bot, the swap execution logic would be called here.
-            # e.g., self.dex1.execute_swap(...)
+            size = self.risk.position_size(1.0, profit_margin / price1)
+            logger.info("Risk-approved size: %.4f", size)
+            # e.g., await self.dex1.execute_swap(...)
             logger.warning("--- EXECUTION LOGIC DISABLED IN THIS EXAMPLE ---")
         else:
             logger.info("No profitable opportunity found. Standing by.")

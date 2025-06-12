@@ -21,6 +21,14 @@ class TradingSettings(BaseModel):
     max_daily_volume: float = Field(100.0, gt=0)
 
 
+class RiskSettings(BaseModel):
+    """Risk management parameters."""
+
+    max_drawdown_percent: float = Field(20.0, ge=0, le=100)
+    stop_loss_percent: float = Field(5.0, ge=0, le=100)
+    take_profit_percent: float = Field(10.0, ge=0, le=100)
+
+
 class DexSettings(BaseModel):
     """DEX related parameters."""
 
@@ -42,6 +50,7 @@ class AppConfig(BaseModel):
     poll_interval_seconds: int = Field(10, gt=0)
     slippage_tolerance_percent: float = Field(0.5, ge=0, le=100)
     trading: TradingSettings
+    risk: RiskSettings
     dex: DexSettings
 
     @validator(
@@ -97,6 +106,13 @@ class ConfigManager:
                 "risk_limit": float(os.getenv("RISK_LIMIT", 0.01)),
                 "max_daily_volume": float(os.getenv("MAX_DAILY_VOLUME", 100.0)),
             },
+            "risk": {
+                "max_drawdown_percent": float(
+                    os.getenv("MAX_DRAWDOWN_PERCENT", 20.0)
+                ),
+                "stop_loss_percent": float(os.getenv("STOP_LOSS_PERCENT", 5.0)),
+                "take_profit_percent": float(os.getenv("TAKE_PROFIT_PERCENT", 10.0)),
+            },
             "dex": {
                 "gas_limit": int(os.getenv("GAS_LIMIT", 250_000)),
                 "tx_timeout": int(os.getenv("TX_TIMEOUT", 120)),
@@ -134,6 +150,9 @@ def _update_globals(cfg: AppConfig) -> None:
         "MAX_POSITION_SIZE": cfg.trading.max_position_size,
         "RISK_LIMIT": cfg.trading.risk_limit,
         "MAX_DAILY_VOLUME": cfg.trading.max_daily_volume,
+        "MAX_DRAWDOWN_PERCENT": cfg.risk.max_drawdown_percent,
+        "STOP_LOSS_PERCENT": cfg.risk.stop_loss_percent,
+        "TAKE_PROFIT_PERCENT": cfg.risk.take_profit_percent,
         "GAS_LIMIT": cfg.dex.gas_limit,
         "TX_TIMEOUT": cfg.dex.tx_timeout,
     }
@@ -156,6 +175,9 @@ SLIPPAGE_TOLERANCE_PERCENT = cfg.slippage_tolerance_percent
 MAX_POSITION_SIZE = cfg.trading.max_position_size
 RISK_LIMIT = cfg.trading.risk_limit
 MAX_DAILY_VOLUME = cfg.trading.max_daily_volume
+MAX_DRAWDOWN_PERCENT = cfg.risk.max_drawdown_percent
+STOP_LOSS_PERCENT = cfg.risk.stop_loss_percent
+TAKE_PROFIT_PERCENT = cfg.risk.take_profit_percent
 GAS_LIMIT = cfg.dex.gas_limit
 TX_TIMEOUT = cfg.dex.tx_timeout
 
@@ -174,6 +196,9 @@ __all__ = [
     "MAX_POSITION_SIZE",
     "RISK_LIMIT",
     "MAX_DAILY_VOLUME",
+    "MAX_DRAWDOWN_PERCENT",
+    "STOP_LOSS_PERCENT",
+    "TAKE_PROFIT_PERCENT",
     "GAS_LIMIT",
     "TX_TIMEOUT",
 ]
