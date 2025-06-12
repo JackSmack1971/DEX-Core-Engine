@@ -8,6 +8,7 @@ selected trading strategy.
 """
 
 from typing import List
+import asyncio
 
 import config
 from web3_service import Web3Service
@@ -35,7 +36,7 @@ def main() -> None:
 
         # 3. Initialize and run the trading strategy
         strategy = ArbitrageStrategy(dex_handlers)
-        strategy.run()
+        asyncio.run(strategy.run())
 
     except (ValueError, ConnectionError) as e:
         print(f"Initialization failed: {e}")
