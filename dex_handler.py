@@ -15,7 +15,9 @@ from web3.contract import Contract
 from web3.exceptions import ContractLogicError
 
 import config
-from web3_service import Web3Service
+from web3_service import Web3Service, TransactionFailedError, TransactionTimeoutError
+from exceptions import DexError
+from logger import logger
 
 # A minimal ABI for the Uniswap V2 Router is sufficient for our needs.
 UNISWAP_V2_ROUTER_ABI: Final[List[Dict[str, Any]]] = [
@@ -90,8 +92,8 @@ class DEXHandler:
             )
             # Assuming the output token has 18 decimals, a common standard
             return amounts_out[1] / (10**18)
-        except (ContractLogicError, ValueError):
-            # Handle cases where the liquidity pool might not exist
+        except (ContractLogicError, ValueError) as exc:
+            logger.warning("Price query failed: %s", exc)
             return 0.0
 
     def execute_swap(
@@ -125,5 +127,10 @@ class DEXHandler:
             'gasPrice': self.web3_service.web3.eth.gas_price
         })
 
-        receipt = self.web3_service.sign_and_send_transaction(tx_params)
-        return receipt['transactionHash'].hex()
+        try:
+            receipt = self.web3_service.sign_and_send_transaction(tx_params)
+            return receipt['transactionHash'].hex()
+        except (TransactionFailedError, TransactionTimeoutError) as exc:
+            logger.error("Swap execution failed: %s", exc)
+            raise DexError(str(exc)) from exc
+

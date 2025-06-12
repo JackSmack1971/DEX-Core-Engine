@@ -12,6 +12,8 @@ from typing import List
 
 import config
 from dex_handler import DEXHandler
+from exceptions import StrategyError
+from logger import logger
 
 
 class ArbitrageStrategy:
@@ -31,7 +33,7 @@ class ArbitrageStrategy:
             dex_handlers: A list of two configured DEXHandler instances.
         """
         if len(dex_handlers) != 2:
-            raise ValueError("ArbitrageStrategy requires exactly two DEXs.")
+            raise StrategyError("ArbitrageStrategy requires exactly two DEXs.")
         self.dex1 = dex_handlers[0]
         self.dex2 = dex_handlers[1]
         self.token0 = config.TOKEN0_ADDRESS  # e.g., WETH
@@ -53,29 +55,30 @@ class ArbitrageStrategy:
         # In practice, this should query live gas prices and estimate tx cost
         estimated_gas_cost_in_dai = 50.0
 
-        print(
-            f"Price DEX1: {price1:.2f} DAI | "
-            f"Price DEX2: {price2:.2f} DAI | "
-            f"Margin: {profit_margin:.2f} DAI"
+        logger.info(
+            "Price DEX1: %.2f DAI | Price DEX2: %.2f DAI | Margin: %.2f DAI",
+            price1,
+            price2,
+            profit_margin,
         )
 
         if profit_margin > (estimated_gas_cost_in_dai + config.PROFIT_THRESHOLD):
-            print(f"Profitable opportunity found! Margin: ${profit_margin:.2f}")
+            logger.info("Profitable opportunity found! Margin: $%.2f", profit_margin)
             # In a real bot, the swap execution logic would be called here.
             # e.g., self.dex1.execute_swap(...)
-            print("--- EXECUTION LOGIC DISABLED IN THIS EXAMPLE ---")
+            logger.warning("--- EXECUTION LOGIC DISABLED IN THIS EXAMPLE ---")
         else:
-            print("No profitable opportunity found. Standing by.")
+            logger.info("No profitable opportunity found. Standing by.")
 
     async def run(self) -> None:
         """
         Starts the main trading loop for the strategy.
         """
-        print("--- Starting Arbitrage Trading Bot ---")
-        print(f"Monitoring {self.token0} / {self.token1} pair.")
-        print(f"DEX 1 Router: {self.dex1.router_address}")
-        print(f"DEX 2 Router: {self.dex2.router_address}")
-        print("-" * 40)
+        logger.info("--- Starting Arbitrage Trading Bot ---")
+        logger.info("Monitoring %s / %s pair.", self.token0, self.token1)
+        logger.info("DEX 1 Router: %s", self.dex1.router_address)
+        logger.info("DEX 2 Router: %s", self.dex2.router_address)
+        logger.info("-" * 40)
 
         while True:
             try:
@@ -86,10 +89,10 @@ class ArbitrageStrategy:
                 if price_dex1 > 0 and price_dex2 > 0:
                     self._check_profitability(price_dex1, price_dex2)
                 else:
-                    print("Could not retrieve prices from one or both DEXs.")
+                    logger.warning("Could not retrieve prices from one or both DEXs.")
 
             except Exception as e:
-                print(f"An error occurred: {e}")
+                logger.error("An error occurred: %s", e)
 
-            print(f"Waiting for {config.POLL_INTERVAL_SECONDS} seconds...")
+            logger.info("Waiting for %s seconds...", config.POLL_INTERVAL_SECONDS)
             await asyncio.sleep(config.POLL_INTERVAL_SECONDS)
