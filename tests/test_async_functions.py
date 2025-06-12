@@ -20,6 +20,7 @@ from strategy import ArbitrageStrategy
 async def test_get_price_success(monkeypatch):
     handler = DEXHandler.__new__(DEXHandler)
     handler.contract = MagicMock()
+    handler._circuit = MagicMock(call=lambda f, *a, **kw: f(*a, **kw))
 
     call_mock = MagicMock(return_value=[10**18, 2 * 10**18])
     func_mock = MagicMock(return_value=MagicMock(call=call_mock))
@@ -38,6 +39,7 @@ async def test_get_price_success(monkeypatch):
 async def test_get_price_error(monkeypatch):
     handler = DEXHandler.__new__(DEXHandler)
     handler.contract = MagicMock()
+    handler._circuit = MagicMock(call=lambda f, *a, **kw: f(*a, **kw))
 
     call_mock = MagicMock(side_effect=ValueError("fail"))
     func_mock = MagicMock(return_value=MagicMock(call=call_mock))

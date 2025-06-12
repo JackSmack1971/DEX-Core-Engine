@@ -9,6 +9,7 @@ interface for connecting to a node, creating contract instances,
 and sending signed transactions.
 """
 
+import random
 import time
 from typing import Any, Dict, List, Optional
 
@@ -82,7 +83,9 @@ class Web3Service:
             except TimeExhausted:
                 if attempt == retries - 1:
                     raise TransactionTimeoutError(f"Transaction {tx_hash.hex()} timed out")
-                time.sleep(1)
+                delay = min(0.1 * 2 ** attempt, 30)
+                delay += random.uniform(0, delay / 2)
+                time.sleep(delay)
                 transaction["nonce"] = self.web3.eth.get_transaction_count(self.account.address)
                 continue
             if receipt["status"] == 0:

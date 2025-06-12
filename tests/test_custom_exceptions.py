@@ -8,6 +8,7 @@ os.environ.setdefault("UNISWAP_V2_ROUTER", "0x0000000000000000000000000000000000
 os.environ.setdefault("SUSHISWAP_ROUTER", "0x0000000000000000000000000000000000000004")
 
 from unittest.mock import MagicMock
+import asyncio
 
 import pytest
 
@@ -28,6 +29,7 @@ def test_execute_swap_raises_dex_error():
     handler.contract = MagicMock()
     handler.web3_service.account = MagicMock(address="0xabc")
     handler.web3_service.web3 = MagicMock(eth=MagicMock(gas_price=1))
+    handler._circuit = MagicMock(call=lambda f, *a, **kw: f(*a, **kw))
 
     built_tx = {"tx": 1}
     swap_func = MagicMock(return_value=MagicMock(build_transaction=MagicMock(return_value=built_tx)))
@@ -35,5 +37,5 @@ def test_execute_swap_raises_dex_error():
     handler.web3_service.sign_and_send_transaction.side_effect = TransactionFailedError("fail")
 
     with pytest.raises(DexError):
-        handler.execute_swap(1, ["a", "b"])
+        asyncio.run(handler.execute_swap(1, ["a", "b"]))
 
