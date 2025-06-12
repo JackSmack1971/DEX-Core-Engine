@@ -75,3 +75,22 @@ async def test_arbitrage_run_once(monkeypatch):
         await strategy.run()
 
     strategy._check_profitability.assert_called_with(1.0, 2.0)
+
+@pytest.mark.asyncio
+async def test_execute_swap_increments_metrics(monkeypatch):
+    handler = DEXHandler.__new__(DEXHandler)
+    handler.web3_service = MagicMock()
+    handler.contract = MagicMock()
+    handler.web3_service.account = MagicMock(address="0xabc")
+    handler.web3_service.web3 = MagicMock(eth=MagicMock(gas_price=1))
+    handler._circuit = MagicMock(call=lambda f, *a, **kw: f(*a, **kw))
+    handler._do_swap = AsyncMock(return_value="0xdead")
+
+    from observability.metrics import TRADE_COUNT, TRADE_SUCCESS
+
+    start_count = TRADE_COUNT._value.get()
+    start_success = TRADE_SUCCESS._value.get()
+    tx_hash = await handler.execute_swap(1, ["a", "b"])
+    assert tx_hash == "0xdead"
+    assert TRADE_COUNT._value.get() == start_count + 1
+    assert TRADE_SUCCESS._value.get() == start_success + 1

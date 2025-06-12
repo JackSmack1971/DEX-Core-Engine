@@ -9,4 +9,5 @@ uvicorn
 httpx
 python-json-logger
 prometheus-client
+hypothesis
 
