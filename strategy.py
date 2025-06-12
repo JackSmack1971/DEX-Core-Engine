@@ -7,7 +7,7 @@ This module contains the logic for identifying and acting upon
 trading opportunities based on market conditions.
 """
 
-import time
+import asyncio
 from typing import List
 
 import config
@@ -67,7 +67,7 @@ class ArbitrageStrategy:
         else:
             print("No profitable opportunity found. Standing by.")
 
-    def run(self) -> None:
+    async def run(self) -> None:
         """
         Starts the main trading loop for the strategy.
         """
@@ -80,8 +80,8 @@ class ArbitrageStrategy:
         while True:
             try:
                 # Get price of 1 WETH in DAI on both exchanges
-                price_dex1 = self.dex1.get_price(self.token0, self.token1)
-                price_dex2 = self.dex2.get_price(self.token0, self.token1)
+                price_dex1 = await self.dex1.get_price(self.token0, self.token1)
+                price_dex2 = await self.dex2.get_price(self.token0, self.token1)
 
                 if price_dex1 > 0 and price_dex2 > 0:
                     self._check_profitability(price_dex1, price_dex2)
@@ -92,4 +92,4 @@ class ArbitrageStrategy:
                 print(f"An error occurred: {e}")
 
             print(f"Waiting for {config.POLL_INTERVAL_SECONDS} seconds...")
-            time.sleep(config.POLL_INTERVAL_SECONDS)
+            await asyncio.sleep(config.POLL_INTERVAL_SECONDS)

@@ -8,6 +8,7 @@ swaps on DEXs that follow the Uniswap V2 protocol.
 """
 
 import time
+import asyncio
 from typing import List, Dict, Any, Final
 
 from web3.contract import Contract
@@ -64,7 +65,7 @@ class DEXHandler:
             router_address, UNISWAP_V2_ROUTER_ABI
         )
 
-    def get_price(
+    async def get_price(
         self,
         token_in_address: str,
         token_out_address: str,
@@ -84,9 +85,9 @@ class DEXHandler:
         """
         try:
             path = [token_in_address, token_out_address]
-            amounts_out = self.contract.functions.getAmountsOut(
-                amount_in, path
-            ).call()
+            amounts_out = await asyncio.to_thread(
+                self.contract.functions.getAmountsOut(amount_in, path).call
+            )
             # Assuming the output token has 18 decimals, a common standard
             return amounts_out[1] / (10**18)
         except (ContractLogicError, ValueError):
