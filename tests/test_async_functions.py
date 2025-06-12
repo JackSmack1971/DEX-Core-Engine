@@ -7,6 +7,10 @@ import pytest
 os.environ.setdefault("RPC_URL", "http://localhost")
 os.environ.setdefault("PRIVATE_KEY", "test")
 os.environ.setdefault("WALLET_ADDRESS", "addr")
+os.environ.setdefault("TOKEN0_ADDRESS", "0x0000000000000000000000000000000000000001")
+os.environ.setdefault("TOKEN1_ADDRESS", "0x0000000000000000000000000000000000000002")
+os.environ.setdefault("UNISWAP_V2_ROUTER", "0x0000000000000000000000000000000000000003")
+os.environ.setdefault("SUSHISWAP_ROUTER", "0x0000000000000000000000000000000000000004")
 
 from dex_handler import DEXHandler
 from strategy import ArbitrageStrategy

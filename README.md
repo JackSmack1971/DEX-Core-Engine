@@ -87,9 +87,19 @@ Create a .env file in the project's root directory. You can copy the .env.exampl
 • It is highly recommended to use a new, dedicated "hot wallet" for this bot with a limited amount of funds.
 Your .env file should look like this:
 ```
-# Ethereum Node RPC URL from a provider like Infura or Alchemy RPC_URL="YOUR_RPC_URL_HERE" 
-# Wallet credentials 
-# WARNING: This is your private key. Keep it secret, keep it safe. PRIVATE_KEY="YOUR_WALLET_PRIVATE_KEY_HERE" WALLET_ADDRESS="YOUR_WALLET_PUBLIC_ADDRESS_HERE"
+# Ethereum Node RPC URL from a provider like Infura or Alchemy
+RPC_URL="YOUR_RPC_URL_HERE"
+
+# Wallet credentials
+# WARNING: This is your private key. Keep it secret, keep it safe.
+PRIVATE_KEY="YOUR_WALLET_PRIVATE_KEY_HERE"
+WALLET_ADDRESS="YOUR_WALLET_PUBLIC_ADDRESS_HERE"
+
+# Token and DEX configuration
+TOKEN0_ADDRESS="0xYourToken0"
+TOKEN1_ADDRESS="0xYourToken1"
+UNISWAP_V2_ROUTER="0xUniswapRouter"
+SUSHISWAP_ROUTER="0xSushiswapRouter"
 ```
 
 ▶️ Usage

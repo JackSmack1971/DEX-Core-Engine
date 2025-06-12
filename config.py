@@ -38,14 +38,22 @@ if not WALLET_ADDRESS:
 
 # --- Trading Pair Configuration ---
 # Addresses of the tokens to be traded.
-# Example uses WETH and DAI.
-TOKEN0_ADDRESS: Final[str] = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2" # WETH
-TOKEN1_ADDRESS: Final[str] = "0x6B175474E89094C44Da98b954EedeAC495271d0F" # DAI
+# Values must be provided via environment variables.
+def _load_address(var_name: str) -> str:
+    address = os.getenv(var_name, "").strip()
+    if not address:
+        raise ConfigurationError(f"{var_name} environment variable not set.")
+    if not (address.startswith("0x") and len(address) == 42):
+        raise ConfigurationError(f"{var_name} is not a valid address.")
+    return address
+
+TOKEN0_ADDRESS: Final[str] = _load_address("TOKEN0_ADDRESS")
+TOKEN1_ADDRESS: Final[str] = _load_address("TOKEN1_ADDRESS")
 
 # --- DEX Configuration ---
 # Contract addresses for Uniswap V2 and Sushiswap Routers.
-UNISWAP_V2_ROUTER: Final[str] = "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D"
-SUSHISWAP_ROUTER: Final[str] = "0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F"
+UNISWAP_V2_ROUTER: Final[str] = _load_address("UNISWAP_V2_ROUTER")
+SUSHISWAP_ROUTER: Final[str] = _load_address("SUSHISWAP_ROUTER")
 
 DEX_ROUTERS: Final[List[str]] = [UNISWAP_V2_ROUTER, SUSHISWAP_ROUTER]
 
