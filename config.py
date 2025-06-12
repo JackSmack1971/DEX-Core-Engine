@@ -11,6 +11,8 @@ from environment variables.
 import os
 from typing import List, Final
 
+from exceptions import ConfigurationError
+
 from dotenv import load_dotenv
 
 # --- Load environment variables from .env file ---
@@ -21,18 +23,18 @@ load_dotenv()
 # Example: "https://mainnet.infura.io/v3/YOUR_INFURA_PROJECT_ID"
 RPC_URL: Final[str] = os.getenv("RPC_URL", "")
 if not RPC_URL:
-    raise ValueError("RPC_URL environment variable not set.")
+    raise ConfigurationError("RPC_URL environment variable not set.")
 
 # The private key of the trading wallet.
 # WARNING: Keep this key secure and never expose it.
 PRIVATE_KEY: Final[str] = os.getenv("PRIVATE_KEY", "")
 if not PRIVATE_KEY:
-    raise ValueError("PRIVATE_KEY environment variable not set.")
+    raise ConfigurationError("PRIVATE_KEY environment variable not set.")
 
 # The public address of the trading wallet.
 WALLET_ADDRESS: Final[str] = os.getenv("WALLET_ADDRESS", "")
 if not WALLET_ADDRESS:
-    raise ValueError("WALLET_ADDRESS environment variable not set.")
+    raise ConfigurationError("WALLET_ADDRESS environment variable not set.")
 
 # --- Trading Pair Configuration ---
 # Addresses of the tokens to be traded.
