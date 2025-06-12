@@ -10,7 +10,7 @@ if str(ROOT_DIR) not in sys.path:
 # Set default environment variables to satisfy config loading
 os.environ.setdefault("RPC_URL", "http://localhost")
 os.environ.setdefault("PRIVATE_KEY", "test")
-os.environ.setdefault("WALLET_ADDRESS", "addr")
+os.environ.setdefault("WALLET_ADDRESS", "0x0000000000000000000000000000000000000005")
 os.environ.setdefault("TOKEN0_ADDRESS", "0x0000000000000000000000000000000000000001")
 os.environ.setdefault("TOKEN1_ADDRESS", "0x0000000000000000000000000000000000000002")
 os.environ.setdefault("UNISWAP_V2_ROUTER", "0x0000000000000000000000000000000000000003")
