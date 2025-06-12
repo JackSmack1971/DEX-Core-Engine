@@ -34,7 +34,10 @@ def test_execute_swap_raises_dex_error():
     built_tx = {"tx": 1}
     swap_func = MagicMock(return_value=MagicMock(build_transaction=MagicMock(return_value=built_tx)))
     handler.contract.functions.swapExactETHForTokens = swap_func
-    handler.web3_service.sign_and_send_transaction.side_effect = TransactionFailedError("fail")
+    async def fail_tx(*args, **kwargs):
+        raise TransactionFailedError("fail")
+
+    handler.web3_service.sign_and_send_transaction.side_effect = fail_tx
 
     with pytest.raises(DexError):
         asyncio.run(handler.execute_swap(1, ["a", "b"]))

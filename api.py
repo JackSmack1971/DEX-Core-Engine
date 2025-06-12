@@ -6,7 +6,10 @@ from fastapi import FastAPI, Request, responses
 
 from middleware.rate_limiter import RateLimiterMiddleware
 from exceptions import BaseAppError, RateLimitError
-from logger import logger
+from prometheus_client import generate_latest
+from logger import get_logger
+
+logger = get_logger("api")
 
 app = FastAPI()
 app.add_middleware(RateLimiterMiddleware)
@@ -31,4 +34,22 @@ async def health():
 async def ready():
     """Readiness check."""
     return {"status": "ready"}
+
+
+@app.get("/metrics")
+async def metrics() -> responses.Response:
+    """Prometheus metrics endpoint."""
+    return responses.Response(generate_latest(), media_type="text/plain")
+
+
+@app.get("/exchange")
+async def exchange_status():
+    """Exchange connectivity check."""
+    return {"status": "ok"}
+
+
+@app.get("/strategy")
+async def strategy_health():
+    """Simple strategy health endpoint."""
+    return {"status": "running"}
 

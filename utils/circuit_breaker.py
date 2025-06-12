@@ -7,7 +7,9 @@ import time
 from collections.abc import Awaitable, Callable
 from typing import Any
 
-from logger import logger
+from logger import get_logger
+
+logger = get_logger("circuit_breaker")
 from exceptions import ServiceUnavailableError
 
 

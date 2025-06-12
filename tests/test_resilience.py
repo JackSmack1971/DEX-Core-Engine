@@ -3,7 +3,7 @@ import time
 from fastapi.testclient import TestClient
 import pytest
 
-from api import app
+from api import app, metrics
 from utils.circuit_breaker import CircuitBreaker
 from utils.retry import retry_async
 from exceptions import ServiceUnavailableError
@@ -47,3 +47,9 @@ def test_rate_limit_and_health_endpoints():
     assert r.status_code == 429
     r = client.get("/ready")
     assert r.status_code == 429
+
+
+def test_metrics_endpoint():
+    response = asyncio.run(metrics())
+    assert response.status_code == 200
+    assert b"trade_count_total" in response.body
