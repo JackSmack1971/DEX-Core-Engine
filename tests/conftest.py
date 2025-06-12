@@ -18,5 +18,8 @@ os.environ.setdefault("SUSHISWAP_ROUTER", "0x00000000000000000000000000000000000
 os.environ.setdefault("MAX_POSITION_SIZE", "1.0")
 os.environ.setdefault("RISK_LIMIT", "0.01")
 os.environ.setdefault("MAX_DAILY_VOLUME", "100.0")
+os.environ.setdefault("MAX_DRAWDOWN_PERCENT", "20.0")
+os.environ.setdefault("STOP_LOSS_PERCENT", "5.0")
+os.environ.setdefault("TAKE_PROFIT_PERCENT", "10.0")
 os.environ.setdefault("GAS_LIMIT", "250000")
 os.environ.setdefault("TX_TIMEOUT", "120")
