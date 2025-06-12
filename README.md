@@ -77,10 +77,7 @@ source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
 ```
 pip install -r requirements.txt
 ```
-A requirements.txt file should contain:
-```
-web3 python-dotenv
-```
+The required dependencies are listed in `requirements.txt`.
 4. Configure Environment Variables
    
 Create a .env file in the project's root directory. You can copy the .env.example file if it exists, or create one from scratch.
