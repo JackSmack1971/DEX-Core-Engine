@@ -23,7 +23,11 @@ from web3_service import (
 from exceptions import DexError, ServiceUnavailableError
 from utils.circuit_breaker import CircuitBreaker
 from utils.retry import retry_async
-from logger import logger
+from logger import get_logger
+from observability.decorators import log_and_measure
+from observability.metrics import TRADE_COUNT, TRADE_SUCCESS
+
+logger = get_logger("dex_handler")
 
 # A minimal ABI for the Uniswap V2 Router is sufficient for our needs.
 UNISWAP_V2_ROUTER_ABI: Final[List[Dict[str, Any]]] = [
@@ -74,6 +78,7 @@ class DEXHandler:
         )
         self._circuit = CircuitBreaker()
 
+    @log_and_measure("dex_handler", warn_ms=500)
     async def _query_price(
         self, token_in_address: str, token_out_address: str, amount_in: int
     ) -> float:
@@ -105,6 +110,7 @@ class DEXHandler:
             logger.warning("Price query failed: %s", exc)
             return 0.0
 
+    @log_and_measure("dex_handler", warn_ms=5000)
     async def _do_swap(self, amount_in_wei: int, path: List[str]) -> str:
         amount_out_min = 0
         to_address = self.web3_service.account.address
@@ -122,7 +128,7 @@ class DEXHandler:
                 "gasPrice": self.web3_service.web3.eth.gas_price,
             }
         )
-        receipt = self.web3_service.sign_and_send_transaction(tx_params)
+        receipt = await self.web3_service.sign_and_send_transaction(tx_params)
         return receipt["transactionHash"].hex()
 
     async def execute_swap(
@@ -132,12 +138,15 @@ class DEXHandler:
     ) -> str:
         """Execute swap with circuit breaker and retry logic."""
         try:
-            return await self._circuit.call(
+            tx_hash = await self._circuit.call(
                 retry_async,
                 self._do_swap,
                 amount_in_wei,
                 path,
             )
+            TRADE_COUNT.inc()
+            TRADE_SUCCESS.inc()
+            return tx_hash
         except ServiceUnavailableError as exc:
             logger.error("Swap circuit open: %s", exc)
             raise DexError("service unavailable") from exc

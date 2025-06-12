@@ -7,4 +7,6 @@ pydantic
 fastapi
 uvicorn
 httpx
+python-json-logger
+prometheus-client
 

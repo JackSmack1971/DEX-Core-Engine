@@ -22,6 +22,13 @@ except ImportError:  # web3 v7
 from web3.types import TxParams, TxReceipt
 from web3.exceptions import TimeExhausted
 
+from logger import get_logger
+from observability.decorators import log_and_measure
+
+logger = get_logger("web3_service")
+
+from observability.decorators import log_and_measure
+
 
 class TransactionFailedError(Exception):
     """Custom exception for failed on-chain transactions."""
@@ -68,7 +75,8 @@ class Web3Service:
         checksum_address = self.web3.to_checksum_address(address)
         return self.web3.eth.contract(address=checksum_address, abi=abi)
 
-    def sign_and_send_transaction(
+    @log_and_measure("web3_service", warn_ms=1000)
+    async def sign_and_send_transaction(
         self, transaction: TxParams, timeout: int = 120, retries: int = 3
     ) -> TxReceipt:
         """Sign and send a transaction with retry and timeout logic."""

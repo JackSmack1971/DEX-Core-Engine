@@ -7,7 +7,9 @@ import random
 from collections.abc import Awaitable, Callable
 from typing import Any
 
-from logger import logger
+from logger import get_logger
+
+logger = get_logger("retry")
 
 
 async def retry_async(

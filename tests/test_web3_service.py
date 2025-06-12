@@ -2,6 +2,8 @@ import pytest
 from unittest.mock import MagicMock
 
 from web3.exceptions import TimeExhausted
+import asyncio
+
 from web3_service import Web3Service, TransactionFailedError, TransactionTimeoutError
 
 
@@ -20,7 +22,7 @@ def test_sign_and_send_success():
     service.web3.eth.send_raw_transaction.return_value = b"hash"
     service.web3.eth.wait_for_transaction_receipt.return_value = receipt
 
-    result = service.sign_and_send_transaction({})
+    result = asyncio.run(service.sign_and_send_transaction({}))
     assert result is receipt
 
 
@@ -31,7 +33,7 @@ def test_sign_and_send_failure_status_zero():
     service.web3.eth.wait_for_transaction_receipt.return_value = receipt
 
     with pytest.raises(TransactionFailedError):
-        service.sign_and_send_transaction({})
+        asyncio.run(service.sign_and_send_transaction({}))
 
 
 def test_sign_and_send_timeout_then_raises():
@@ -40,7 +42,7 @@ def test_sign_and_send_timeout_then_raises():
     service.web3.eth.wait_for_transaction_receipt.side_effect = TimeExhausted
 
     with pytest.raises(TransactionTimeoutError):
-        service.sign_and_send_transaction({}, timeout=0.1, retries=2)
+        asyncio.run(service.sign_and_send_transaction({}, timeout=0.1, retries=2))
 
 
 def test_sign_and_send_timeout_then_success():
@@ -49,5 +51,5 @@ def test_sign_and_send_timeout_then_success():
     service.web3.eth.send_raw_transaction.return_value = b"hash"
     service.web3.eth.wait_for_transaction_receipt.side_effect = [TimeExhausted, receipt]
 
-    result = service.sign_and_send_transaction({}, timeout=0.1, retries=2)
+    result = asyncio.run(service.sign_and_send_transaction({}, timeout=0.1, retries=2))
     assert result is receipt

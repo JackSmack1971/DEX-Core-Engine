@@ -15,7 +15,9 @@ from web3_service import Web3Service
 from dex_handler import DEXHandler
 from strategy import ArbitrageStrategy
 from exceptions import ConfigurationError, DexError, StrategyError
-from logger import logger, set_correlation_id
+from logger import get_logger, set_correlation_id
+
+logger = get_logger("main")
 
 
 def main() -> None:

@@ -13,7 +13,9 @@ from typing import List
 import config
 from dex_handler import DEXHandler
 from exceptions import StrategyError
-from logger import logger
+from logger import get_logger, set_correlation_id
+
+logger = get_logger("strategy")
 
 
 class ArbitrageStrategy:
@@ -82,6 +84,7 @@ class ArbitrageStrategy:
 
         while True:
             try:
+                set_correlation_id()
                 # Get price of 1 WETH in DAI on both exchanges
                 price_dex1 = await self.dex1.get_price(self.token0, self.token1)
                 price_dex2 = await self.dex2.get_price(self.token0, self.token1)
