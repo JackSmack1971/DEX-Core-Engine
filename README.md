@@ -21,6 +21,9 @@ This follows the **Single Responsibility Principle**, making the codebase easy t
 * **Robust Error Handling**: Implements specific exception handling for network issues and failed transactions, ensuring the bot operates reliably.
 * **Extensible Framework**: The decoupled design allows developers to easily implement and plug in new, more complex trading strategies without modifying the core boilerplate.
 * **Adherence to Best Practices**: Built from the ground up following industry-standard Python best practices, including PEP 8 compliance, comprehensive typing, and clear documentation.
+* **Routing Engine**: Supports multi-hop swaps across Uniswap V3, Curve, and Balancer with cached path finding.
+* **Batch Transactions**: Optional multicall-based batching to reduce gas costs.
+* **MEV Protection**: Configurable flashbots submission and simulation to guard against front-running.
 
 ## 🏗️ Project Architecture
 
@@ -100,6 +103,14 @@ TOKEN0_ADDRESS="0xYourToken0"
 TOKEN1_ADDRESS="0xYourToken1"
 UNISWAP_V2_ROUTER="0xUniswapRouter"
 SUSHISWAP_ROUTER="0xSushiswapRouter"
+UNISWAP_V3_QUOTER="0xUniswapV3Quoter"
+UNISWAP_V3_ROUTER="0xUniswapV3Router"
+CURVE_POOL="0xCurvePool"
+BALANCER_VAULT="0xBalancerVault"
+BALANCER_POOL_ID="0xPoolId"
+MULTICALL_ADDRESS="0xMulticall"
+MEV_PROTECTION_ENABLED=false
+BATCH_TRANSACTIONS_ENABLED=false
 ```
 
 ▶️ Usage
@@ -120,6 +131,19 @@ DEX 1 Router: 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D
 DEX 2 Router: 0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F ---------------------------------------- 
 Price DEX1: 3450.12 DAI | Price DEX2: 3451.50 DAI | Margin: 1.38 DAI
 No profitable opportunity found. Standing by. Waiting for 10 seconds...
+```
+
+### Batch Transaction Example
+
+When `BATCH_TRANSACTIONS_ENABLED` is true and `MULTICALL_ADDRESS` is
+configured, you can send multiple swaps in a single transaction:
+
+```python
+from batcher import Batcher
+
+batcher = Batcher(web3_service, MULTICALL_ADDRESS)
+tx_hash = await batcher.execute([swap1_data, swap2_data], reorder=True)
+print("Batched transaction", tx_hash)
 ```
 
 ## Resilience & Health Checks
