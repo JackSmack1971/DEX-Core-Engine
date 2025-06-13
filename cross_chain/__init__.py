@@ -5,6 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 
 from web3_service import Web3Service
+from .bridge_provider import BridgeProvider, HttpBridgeProvider, BridgeProviderError
 
 
 class BridgeError(Exception):
@@ -46,4 +47,13 @@ class WormholeBridge(Bridge):
             raise BridgeError(str(exc)) from exc
 
 
-__all__ = ["Bridge", "LayerZeroBridge", "CCIPBridge", "WormholeBridge", "BridgeError"]
+__all__ = [
+    "Bridge",
+    "LayerZeroBridge",
+    "CCIPBridge",
+    "WormholeBridge",
+    "BridgeError",
+    "BridgeProvider",
+    "HttpBridgeProvider",
+    "BridgeProviderError",
+]

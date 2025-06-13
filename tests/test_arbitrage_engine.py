@@ -14,6 +14,7 @@ class DummyRouter:
     def __init__(self) -> None:
         self.get_best_quote = AsyncMock(side_effect=[1.1, 1.2])
         self.execute_swap = AsyncMock(return_value="0xtx")
+        self.find_triangular_cycles = lambda: []
 
 
 @pytest.mark.asyncio
