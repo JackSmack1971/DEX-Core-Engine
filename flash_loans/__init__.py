@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-"""Flash loan utilities."""
+"""Flash loan utilities and providers."""
 
 from abc import ABC, abstractmethod
 from typing import Awaitable, Callable
@@ -49,4 +49,83 @@ class FlashLoanExecutor:
         return tx
 
 
-__all__ = ["FlashLoanProvider", "FlashLoanExecutor", "FlashLoanError"]
+class AaveFlashLoanProvider(FlashLoanProvider):
+    """Stub provider for Aave flash loans."""
+
+    async def borrow(self, token: str, amount: int) -> str:
+        if not token or amount <= 0:
+            raise FlashLoanError("invalid borrow args")
+        try:
+            tx = {"to": "aave", "value": 0}
+            receipt = await self.service.sign_and_send_transaction(tx)
+            return receipt["transactionHash"].hex()
+        except Exception as exc:  # noqa: BLE001
+            raise FlashLoanError(str(exc)) from exc
+
+    async def repay(self, token: str, amount: int) -> str:
+        if not token or amount <= 0:
+            raise FlashLoanError("invalid repay args")
+        try:
+            tx = {"to": "aave", "value": 0}
+            receipt = await self.service.sign_and_send_transaction(tx)
+            return receipt["transactionHash"].hex()
+        except Exception as exc:  # noqa: BLE001
+            raise FlashLoanError(str(exc)) from exc
+
+
+class DyDxFlashLoanProvider(FlashLoanProvider):
+    """Stub provider for dYdX flash loans."""
+
+    async def borrow(self, token: str, amount: int) -> str:
+        if not token or amount <= 0:
+            raise FlashLoanError("invalid borrow args")
+        try:
+            tx = {"to": "dydx", "value": 0}
+            receipt = await self.service.sign_and_send_transaction(tx)
+            return receipt["transactionHash"].hex()
+        except Exception as exc:  # noqa: BLE001
+            raise FlashLoanError(str(exc)) from exc
+
+    async def repay(self, token: str, amount: int) -> str:
+        if not token or amount <= 0:
+            raise FlashLoanError("invalid repay args")
+        try:
+            tx = {"to": "dydx", "value": 0}
+            receipt = await self.service.sign_and_send_transaction(tx)
+            return receipt["transactionHash"].hex()
+        except Exception as exc:  # noqa: BLE001
+            raise FlashLoanError(str(exc)) from exc
+
+
+class BalancerFlashLoanProvider(FlashLoanProvider):
+    """Stub provider for Balancer flash loans."""
+
+    async def borrow(self, token: str, amount: int) -> str:
+        if not token or amount <= 0:
+            raise FlashLoanError("invalid borrow args")
+        try:
+            tx = {"to": "balancer", "value": 0}
+            receipt = await self.service.sign_and_send_transaction(tx)
+            return receipt["transactionHash"].hex()
+        except Exception as exc:  # noqa: BLE001
+            raise FlashLoanError(str(exc)) from exc
+
+    async def repay(self, token: str, amount: int) -> str:
+        if not token or amount <= 0:
+            raise FlashLoanError("invalid repay args")
+        try:
+            tx = {"to": "balancer", "value": 0}
+            receipt = await self.service.sign_and_send_transaction(tx)
+            return receipt["transactionHash"].hex()
+        except Exception as exc:  # noqa: BLE001
+            raise FlashLoanError(str(exc)) from exc
+
+
+__all__ = [
+    "FlashLoanProvider",
+    "FlashLoanExecutor",
+    "FlashLoanError",
+    "AaveFlashLoanProvider",
+    "DyDxFlashLoanProvider",
+    "BalancerFlashLoanProvider",
+]
