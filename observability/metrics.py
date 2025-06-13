@@ -6,5 +6,15 @@ TRADE_COUNT = Counter('trade_count_total', 'Number of trades executed')
 TRADE_SUCCESS = Counter('trade_success_total', 'Number of successful trades')
 TRADE_PNL = Counter('trade_pnl_total', 'Total realized P&L')
 API_LATENCY = Histogram('api_latency_seconds', 'Latency of API calls')
-
-__all__ = ['TRADE_COUNT', 'TRADE_SUCCESS', 'TRADE_PNL', 'API_LATENCY']
+SLIPPAGE_CHECKS = Counter('slippage_checks_total', 'Number of slippage checks')
+SLIPPAGE_REJECTED = Counter(
+    'slippage_rejected_total', 'Trades rejected due to slippage'
+)
+__all__ = [
+    'TRADE_COUNT',
+    'TRADE_SUCCESS',
+    'TRADE_PNL',
+    'API_LATENCY',
+    'SLIPPAGE_CHECKS',
+    'SLIPPAGE_REJECTED',
+]
