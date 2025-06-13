@@ -9,6 +9,7 @@ from slippage_protection import (
     SlippageParams,
     SlippageProtectionEngine,
 )
+import routing
 from routing import Router
 
 
@@ -98,8 +99,35 @@ async def test_fallback_to_static_slippage(monkeypatch):
     async def fail() -> MarketConditions:
         raise ServiceUnavailableError("fail")
 
-    monkeypatch.setattr(router.slippage_engine, "get_market_conditions", AsyncMock(side_effect=fail))
+    monkeypatch.setattr(
+        router.slippage_engine, "get_market_conditions", AsyncMock(side_effect=fail)
+    )
     p1.liq = LiquidityInfo(liquidity=100.0, price_impact=0.0)
     await router.execute_swap(2, "a", "b")
     assert p1.execute_swap.await_count == 1
 
+
+@pytest.mark.asyncio
+async def test_router_invokes_analysis(monkeypatch):
+    p1 = DummyProto([("a", "b", 1)], "p1")
+    router = Router([p1])
+    engine = SlippageProtectionEngine(SlippageParams(1.0, None))
+    router.slippage_engine = engine
+    market = MarketConditions(100.0, 100.0, 0.2)
+    called = {"count": 0}
+    monkeypatch.setattr(engine, "get_market_conditions", AsyncMock(return_value=market))
+
+    def _analyze(_: MarketConditions) -> str:
+        called["count"] += 1
+        return "stable"
+
+    monkeypatch.setattr(engine, "analyze_market_conditions", _analyze)
+    monkeypatch.setattr(
+        routing.router,
+        "calculate_dynamic_slippage",
+        lambda impact, vol: 5.0,
+    )
+    p1.liq = LiquidityInfo(liquidity=100.0, price_impact=0.1)
+    await router.execute_swap(2, "a", "b")
+    assert called["count"] >= 1
+    assert p1.execute_swap.await_count >= 2

@@ -7,6 +7,7 @@ from slippage_protection import (
     MarketConditions,
     SlippageParams,
     SlippageProtectionEngine,
+    calculate_dynamic_slippage,
 )
 from observability.metrics import SLIPPAGE_CHECKS, SLIPPAGE_REJECTED
 
@@ -64,3 +65,22 @@ async def test_check_warns_on_liquidity(monkeypatch):
     )
     await engine.check(100.0, 10)
     assert warnings
+
+
+def test_analyze_market_conditions_classification():
+    engine = SlippageProtectionEngine(SlippageParams(1.0, None))
+    assert (
+        engine.analyze_market_conditions(MarketConditions(100.0, 100.0, 0.6))
+        == "volatile"
+    )
+    assert (
+        engine.analyze_market_conditions(MarketConditions(100.0, 5.0, 0.1))
+        == "illiquid"
+    )
+    assert (
+        engine.analyze_market_conditions(MarketConditions(100.0, 50.0, 0.1)) == "stable"
+    )
+
+
+def test_calculate_dynamic_slippage():
+    assert calculate_dynamic_slippage(0.1, 0.2) == 0.1 * 1.2
