@@ -1,0 +1,106 @@
+from __future__ import annotations
+
+"""Advanced arbitrage engine handling multiple arbitrage types."""
+
+from dataclasses import dataclass
+from enum import Enum
+from typing import Any, Dict, Iterable, List
+
+from routing import Router
+from strategies.base import BaseStrategy, StrategyConfig
+from logger import get_logger
+
+
+class ArbitrageType(Enum):
+    """Supported arbitrage opportunity types."""
+
+    SIMPLE = "simple"
+    TRIANGULAR = "triangular"
+    FLASH_LOAN = "flash_loan"
+    CROSS_CHAIN = "cross_chain"
+
+
+@dataclass
+class ArbitrageOpportunity:
+    """Details about a detected opportunity."""
+
+    opportunity_type: ArbitrageType
+    path: List[str]
+    profit: float
+
+
+class OpportunityDetector:
+    """Scan token pairs via ``Router`` for arbitrage opportunities."""
+
+    def __init__(self, router: Router, tokens: Iterable[str], amount: float = 1.0) -> None:
+        self.router = router
+        self.tokens = list(tokens)
+        self.amount = amount
+        self.logger = get_logger("opportunity_detector")
+
+    async def scan(self) -> List[ArbitrageOpportunity]:
+        """Return a list of simple opportunities between all token pairs."""
+        opportunities: List[ArbitrageOpportunity] = []
+        for token_in in self.tokens:
+            for token_out in self.tokens:
+                if token_in == token_out:
+                    continue
+                try:
+                    out1 = await self.router.get_best_quote(token_in, token_out, int(self.amount))
+                    out2 = await self.router.get_best_quote(token_out, token_in, int(out1))
+                    profit = out2 - self.amount
+                    if profit > 0:
+                        opportunities.append(
+                            ArbitrageOpportunity(ArbitrageType.SIMPLE, [token_in, token_out, token_in], profit)
+                        )
+                except Exception as exc:  # noqa: BLE001
+                    self.logger.error("scan error: %s", exc)
+        return opportunities
+
+
+class ArbitrageEngine(BaseStrategy):
+    """Strategy engine that executes various arbitrage types."""
+
+    def __init__(
+        self,
+        router: Router,
+        strategy_config: StrategyConfig | None = None,
+        risk_manager: Any | None = None,
+        tokens: Iterable[str] | None = None,
+    ) -> None:
+        cfg = strategy_config or StrategyConfig(name="arbitrage_engine")
+        super().__init__(router, cfg, risk_manager)
+        self.tokens = list(tokens or [])
+        self.detector = OpportunityDetector(router, self.tokens)
+
+    async def analyze_market(self) -> Dict[str, Any]:
+        opportunities = await self.detector.scan()
+        return {"opportunities": opportunities}
+
+    async def generate_signals(self, market_data: Dict[str, Any]) -> List[ArbitrageOpportunity]:
+        return market_data.get("opportunities", [])
+
+    async def execute_trades(self, signals: List[ArbitrageOpportunity]) -> List[str]:
+        tx_hashes: List[str] = []
+        for opp in signals:
+            try:
+                if opp.opportunity_type == ArbitrageType.SIMPLE:
+                    tx = await self.router.execute_swap(int(self.detector.amount), opp.path[0], opp.path[1])
+                else:
+                    self.logger.warning("Engine type %s not implemented", opp.opportunity_type.value)
+                    tx = "0x0"
+                tx_hashes.append(tx)
+            except Exception as exc:  # noqa: BLE001
+                self.logger.error("trade failed: %s", exc)
+        return tx_hashes
+
+    async def run(self) -> None:  # pragma: no cover - thin wrapper
+        await self.start()
+
+
+__all__ = [
+    "ArbitrageType",
+    "ArbitrageOpportunity",
+    "OpportunityDetector",
+    "ArbitrageEngine",
+]

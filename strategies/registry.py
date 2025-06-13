@@ -5,6 +5,8 @@ from __future__ import annotations
 from typing import Callable, Dict, List, Type
 
 from strategies.base import BaseStrategy
+from strategies.arbitrage import ArbitrageStrategy
+from strategies.arbitrage_engine import ArbitrageEngine
 
 
 class StrategyRegistry:
@@ -13,6 +15,8 @@ class StrategyRegistry:
     def __init__(self) -> None:
         self._strategies: Dict[str, Type[BaseStrategy]] = {}
         self._factories: Dict[str, Callable[..., BaseStrategy]] = {}
+        self.register("arbitrage", ArbitrageStrategy)
+        self.register("arbitrage_engine", ArbitrageEngine)
 
     def register(
         self,
@@ -34,4 +38,4 @@ class StrategyRegistry:
     def list_strategies(self) -> List[str]:
         return list(self._strategies.keys())
 
-__all__ = ["StrategyRegistry"]
+__all__ = ["StrategyRegistry", "ArbitrageStrategy", "ArbitrageEngine"]

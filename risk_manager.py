@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import math
 from collections import deque
-from dataclasses import dataclass
-from typing import Deque, List
+from dataclasses import dataclass, field
+from typing import Deque, Dict, List
 
 import config
-from exceptions import StrategyError
+from exceptions import InventoryError, StrategyError
 from logger import get_logger
 
 
@@ -40,6 +40,7 @@ class RiskManager:
         self.high_water = self.equity
         self.positions: List[Position] = []
         self.returns: Deque[float] = deque(maxlen=100)
+        self.inventory: Dict[str, float] = {}
 
     def position_size(self, balance: float, risk_per_trade: float) -> float:
         """Compute position size using fixed fractional/Kelly."""
@@ -91,6 +92,37 @@ class RiskManager:
                 remaining.append(pos)
         self.positions = remaining
         return closed
+
+    def add_inventory(self, token: str, amount: float) -> None:
+        """Increase inventory for ``token``."""
+        if amount < 0:
+            raise InventoryError("amount must be non-negative")
+        self.inventory[token] = self.inventory.get(token, 0.0) + amount
+
+    def remove_inventory(self, token: str, amount: float) -> None:
+        """Decrease inventory for ``token``."""
+        if amount < 0:
+            raise InventoryError("amount must be non-negative")
+        if self.inventory.get(token, 0.0) < amount:
+            raise InventoryError("insufficient inventory")
+        self.inventory[token] -= amount
+
+    def get_inventory(self, token: str) -> float:
+        """Return stored amount of ``token``."""
+        return self.inventory.get(token, 0.0)
+
+    def impermanent_loss(
+        self, initial_price: float, current_price: float, amount0: float, amount1: float
+    ) -> float:
+        """Estimate impermanent loss given price change."""
+        if initial_price <= 0 or current_price <= 0:
+            raise InventoryError("prices must be positive")
+        if amount0 < 0 or amount1 < 0:
+            raise InventoryError("amounts must be non-negative")
+        ratio = current_price / initial_price
+        hodl_value = amount0 + amount1 * ratio
+        lp_value = 2 * math.sqrt(ratio) / (1 + ratio) * hodl_value
+        return hodl_value - lp_value
 
     def var(self, confidence: float = 0.95) -> float:
         """Compute simple historical VaR."""
