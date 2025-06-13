@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import math
 from collections import deque
-from dataclasses import dataclass
-from typing import Deque, Dict, List
+from dataclasses import dataclass, field
+from typing import Deque, Dict, List, Any
+import time
+import copy
 
 import config
 from exceptions import InventoryError, StrategyError
 from logger import get_logger
+from routing import Router
 
 
 logger = get_logger("risk_manager")
@@ -31,10 +34,25 @@ class InventoryItem:
 
     balance: float = 0.0
     price: float = 0.0
+    price_history: Deque[float] = field(
+        default_factory=lambda: deque(maxlen=100)
+    )
+    allocation: float = 0.0
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
     @property
     def value(self) -> float:
         return self.balance * self.price
+
+
+@dataclass
+class PortfolioSnapshot:
+    """Timestamped snapshot of portfolio state."""
+
+    timestamp: float
+    equity: float
+    inventory: Dict[str, InventoryItem]
+    positions: List[Position]
 
 
 class RiskManager:
@@ -136,8 +154,10 @@ class RiskManager:
         item = self.inventory.get(token)
         if item is None:
             self.inventory[token] = InventoryItem(price=price)
+            item = self.inventory[token]
         else:
             item.price = price
+        item.price_history.append(price)
 
     def inventory_value(self) -> float:
         """Return total inventory valuation."""
@@ -210,5 +230,92 @@ class RiskManager:
         logger.critical("Emergency shutdown activated")
 
 
-__all__ = ["RiskManager", "Position", "InventoryItem"]
+class PortfolioRiskManager(RiskManager):
+    """Risk management with portfolio-level checks."""
+
+    def __init__(
+        self,
+        router: "Router",
+        risk_budget: float = 1.0,
+        liquidity_threshold: float = 0.1,
+        concentration_limit: float = 0.5,
+    ) -> None:
+        super().__init__()
+        self.router = router
+        self.risk_budget = risk_budget
+        self.liquidity_threshold = liquidity_threshold
+        self.concentration_limit = concentration_limit
+        self.logger = get_logger("portfolio_risk_manager")
+
+    async def update_price_from_router(
+        self, token: str, base: str, amount: int
+    ) -> None:
+        if amount <= 0:
+            raise InventoryError("amount must be positive")
+        try:
+            quote = await self.router.get_best_quote(token, base, amount)
+        except Exception as exc:  # noqa: BLE001
+            self.logger.error("Price fetch failed: %s", exc)
+            raise InventoryError(str(exc)) from exc
+        price = quote / float(amount)
+        self.set_price(token, price)
+
+    def check_risk_budget(self) -> bool:
+        allowed = self.equity * self.risk_budget
+        total = self.inventory_value()
+        if total > allowed:
+            self.logger.warning("Risk budget breached: %.4f > %.4f", total, allowed)
+            return False
+        return True
+
+    async def check_liquidity(
+        self, token: str, base: str, amount: int
+    ) -> bool:
+        try:
+            protos, route = await self.router.get_best_route(token, base, amount)
+            if not protos:
+                return False
+            info = await protos[0].get_liquidity_info(route[0], route[1], amount)
+            if info.liquidity < amount * self.liquidity_threshold:
+                self.logger.error("Insufficient liquidity for %s", token)
+                return False
+            return True
+        except Exception as exc:  # noqa: BLE001
+            self.logger.error("Liquidity check failed: %s", exc)
+            return False
+
+    def check_concentration(self) -> bool:
+        for token, item in self.inventory.items():
+            if item.allocation > self.concentration_limit:
+                self.logger.error("Concentration too high for %s", token)
+                return False
+        return True
+
+    def stress_test(self, shock_pct: float) -> float:
+        if shock_pct <= 0:
+            raise InventoryError("shock_pct must be positive")
+        loss = 0.0
+        for item in self.inventory.values():
+            loss += item.balance * item.price * shock_pct
+        self.logger.info(
+            "Stress test %.2f%% loss: %.4f", shock_pct * 100, loss
+        )
+        return loss
+
+    def snapshot(self) -> PortfolioSnapshot:
+        return PortfolioSnapshot(
+            time.time(),
+            self.equity,
+            copy.deepcopy(self.inventory),
+            list(self.positions),
+        )
+
+
+__all__ = [
+    "RiskManager",
+    "Position",
+    "InventoryItem",
+    "PortfolioSnapshot",
+    "PortfolioRiskManager",
+]
 
