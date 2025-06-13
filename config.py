@@ -60,6 +60,13 @@ class BatchSettings(BaseModel):
         return Web3.to_checksum_address(value) if value else None
 
 
+class SlippageProtectionSettings(BaseModel):
+    """Dynamic slippage protection parameters."""
+
+    dynamic_slippage_enabled: bool = Field(False)
+    max_slippage_bps: int = Field(50, ge=0)
+
+
 class AppConfig(BaseModel):
     """Validated application configuration."""
 
@@ -83,6 +90,7 @@ class AppConfig(BaseModel):
     dex: DexSettings
     mev: MevProtectionSettings
     batch: BatchSettings
+    slippage_protection: SlippageProtectionSettings
 
     @validator(
         "wallet_address",
@@ -171,6 +179,13 @@ class ConfigManager:
                 == "true",
                 "multicall_address": os.getenv("MULTICALL_ADDRESS"),
             },
+            "slippage_protection": {
+                "dynamic_slippage_enabled": os.getenv(
+                    "DYNAMIC_SLIPPAGE_ENABLED", "false"
+                ).lower()
+                == "true",
+                "max_slippage_bps": int(os.getenv("MAX_SLIPPAGE_BPS", 50)),
+            },
         }
 
     def _build_config(self) -> AppConfig:
@@ -220,6 +235,8 @@ def _update_globals(cfg: AppConfig) -> None:
         "DEVIATION_THRESHOLD": cfg.mev.deviation_threshold,
         "BATCH_TRANSACTIONS_ENABLED": cfg.batch.enabled,
         "MULTICALL_ADDRESS": cfg.batch.multicall_address,
+        "DYNAMIC_SLIPPAGE_ENABLED": cfg.slippage_protection.dynamic_slippage_enabled,
+        "MAX_SLIPPAGE_BPS": cfg.slippage_protection.max_slippage_bps,
     }
     globals().update(mapping)
 
@@ -256,6 +273,8 @@ FORK_RPC_URL = cfg.mev.fork_rpc_url
 DEVIATION_THRESHOLD = cfg.mev.deviation_threshold
 BATCH_TRANSACTIONS_ENABLED = cfg.batch.enabled
 MULTICALL_ADDRESS = cfg.batch.multicall_address
+DYNAMIC_SLIPPAGE_ENABLED = cfg.slippage_protection.dynamic_slippage_enabled
+MAX_SLIPPAGE_BPS = cfg.slippage_protection.max_slippage_bps
 
 __all__ = [
     "CONFIG_MANAGER",
@@ -288,4 +307,6 @@ __all__ = [
     "DEVIATION_THRESHOLD",
     "BATCH_TRANSACTIONS_ENABLED",
     "MULTICALL_ADDRESS",
+    "DYNAMIC_SLIPPAGE_ENABLED",
+    "MAX_SLIPPAGE_BPS",
 ]
