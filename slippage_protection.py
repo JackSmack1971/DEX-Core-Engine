@@ -58,6 +58,14 @@ class SlippageProtectionEngine:
             logger.error("Market data fetch failed: %s", exc)
             raise
 
+    def analyze_market_conditions(self, market: MarketConditions) -> str:
+        """Classify market environment."""
+        if market.volatility > 0.5:
+            return "volatile"
+        if market.liquidity < 10:
+            return "illiquid"
+        return "stable"
+
     async def check(self, expected_price: float, amount: float) -> None:
         if expected_price <= 0 or amount < 0:
             raise ValueError("invalid expected_price or amount")
@@ -66,9 +74,7 @@ class SlippageProtectionEngine:
         slippage = abs(market.price - expected_price) / expected_price * 100
         if slippage > self.params.tolerance_percent:
             SLIPPAGE_REJECTED.inc()
-            raise PriceManipulationError(
-                f"Slippage {slippage:.2f}% exceeds tolerance"
-            )
+            raise PriceManipulationError(f"Slippage {slippage:.2f}% exceeds tolerance")
         if amount > market.liquidity:
             logger.warning(
                 "Trade amount %.4f exceeds liquidity %.4f",
@@ -82,8 +88,15 @@ class SlippageProtectionEngine:
         )
 
 
+def calculate_dynamic_slippage(price_impact: float, volatility: float) -> float:
+    """Compute slippage adjusted for market volatility."""
+    return price_impact * (1 + volatility)
+
+
 __all__ = [
     "MarketConditions",
     "SlippageParams",
     "SlippageProtectionEngine",
+    "calculate_dynamic_slippage",
+    "analyze_market_conditions",
 ]

@@ -10,7 +10,11 @@ import os
 from dex_protocols.base import BaseDEXProtocol
 from exceptions import DexError
 import config
-from slippage_protection import SlippageParams, SlippageProtectionEngine
+from slippage_protection import (
+    SlippageParams,
+    SlippageProtectionEngine,
+    calculate_dynamic_slippage,
+)
 from logger import get_logger
 
 
@@ -22,15 +26,14 @@ class _Edge:
     protocol: BaseDEXProtocol
     cost: float
 
+
 logger = get_logger("router")
 
 
 class Router:
     """Aggregate multiple DEX protocol adapters with multi-hop logic."""
 
-    def __init__(
-        self, protocols: Iterable[BaseDEXProtocol], ttl: int = 30
-    ) -> None:
+    def __init__(self, protocols: Iterable[BaseDEXProtocol], ttl: int = 30) -> None:
         self.protocols: List[BaseDEXProtocol] = list(protocols)
         self._graph: Dict[str, List[_Edge]] = {}
         self._cache: Dict[
@@ -96,12 +99,8 @@ class Router:
             gas_cost = gas_price * getattr(proto, "gas_limit", 0)
             for token_a, token_b, fee in pools:
                 cost = float(fee) + float(gas_cost)
-                self._graph.setdefault(token_a, []).append(
-                    _Edge(token_b, proto, cost)
-                )
-                self._graph.setdefault(token_b, []).append(
-                    _Edge(token_a, proto, cost)
-                )
+                self._graph.setdefault(token_a, []).append(_Edge(token_b, proto, cost))
+                self._graph.setdefault(token_b, []).append(_Edge(token_a, proto, cost))
 
     async def get_best_route(
         self, token_in: str, token_out: str, amount_in: int
@@ -122,9 +121,7 @@ class Router:
         self, token_in: str, token_out: str, amount_in: int
     ) -> float:
         """Return the estimated output amount for the optimal path."""
-        protocols, route = await self.get_best_route(
-            token_in, token_out, amount_in
-        )
+        protocols, route = await self.get_best_route(token_in, token_out, amount_in)
         amt = float(amount_in)
         for idx, proto in enumerate(protocols):
             amt = await proto.get_quote(route[idx], route[idx + 1], int(amt))
@@ -137,19 +134,16 @@ class Router:
             info = await proto.get_liquidity_info(hop[0], hop[1], amount)
             if self.slippage_engine:
                 market = await self.slippage_engine.get_market_conditions()
-                return info.price_impact * (1 + market.volatility)
+                self.slippage_engine.analyze_market_conditions(market)
+                return calculate_dynamic_slippage(info.price_impact, market.volatility)
             return info.price_impact
         except Exception as exc:  # noqa: BLE001
             logger.warning("Slippage data unavailable: %s", exc)
             return 0.0
 
-    async def execute_swap(
-        self, amount_in: int, token_in: str, token_out: str
-    ) -> str:
+    async def execute_swap(self, amount_in: int, token_in: str, token_out: str) -> str:
         """Execute sequential swaps along the optimal path."""
-        protocols, route = await self.get_best_route(
-            token_in, token_out, amount_in
-        )
+        protocols, route = await self.get_best_route(token_in, token_out, amount_in)
         amt = amount_in
         tx = ""
         for idx, proto in enumerate(protocols):
