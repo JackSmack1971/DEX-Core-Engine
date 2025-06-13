@@ -45,6 +45,21 @@ class MevProtectionSettings(BaseModel):
     deviation_threshold: float = Field(0.05, ge=0)
 
 
+class BatchSettings(BaseModel):
+    """Batch transaction configuration."""
+
+    enabled: bool = Field(False)
+    multicall_address: str | None = None
+
+    @validator("multicall_address")
+    def check_multicall(
+        cls, value: str | None
+    ) -> str | None:  # noqa: D417
+        if value and not Web3.is_address(value):
+            raise ValueError("invalid address")
+        return Web3.to_checksum_address(value) if value else None
+
+
 class AppConfig(BaseModel):
     """Validated application configuration."""
 
@@ -55,6 +70,11 @@ class AppConfig(BaseModel):
     token1_address: str
     uniswap_v2_router: str
     sushiswap_router: str
+    uniswap_v3_quoter: str
+    uniswap_v3_router: str
+    curve_pool: str
+    balancer_vault: str
+    balancer_pool_id: str
     profit_threshold: float = Field(1.0, ge=0)
     poll_interval_seconds: int = Field(10, gt=0)
     slippage_tolerance_percent: float = Field(0.5, ge=0, le=100)
@@ -62,6 +82,7 @@ class AppConfig(BaseModel):
     risk: RiskSettings
     dex: DexSettings
     mev: MevProtectionSettings
+    batch: BatchSettings
 
     @validator(
         "wallet_address",
@@ -69,6 +90,10 @@ class AppConfig(BaseModel):
         "token1_address",
         "uniswap_v2_router",
         "sushiswap_router",
+        "uniswap_v3_quoter",
+        "uniswap_v3_router",
+        "curve_pool",
+        "balancer_vault",
     )
     def check_address(cls, value: str) -> str:  # noqa: D417
         if not Web3.is_address(value):
@@ -106,6 +131,11 @@ class ConfigManager:
             "token1_address": self._env("TOKEN1_ADDRESS"),
             "uniswap_v2_router": self._env("UNISWAP_V2_ROUTER"),
             "sushiswap_router": self._env("SUSHISWAP_ROUTER"),
+            "uniswap_v3_quoter": self._env("UNISWAP_V3_QUOTER"),
+            "uniswap_v3_router": self._env("UNISWAP_V3_ROUTER"),
+            "curve_pool": self._env("CURVE_POOL"),
+            "balancer_vault": self._env("BALANCER_VAULT"),
+            "balancer_pool_id": self._env("BALANCER_POOL_ID"),
             "profit_threshold": float(os.getenv("PROFIT_THRESHOLD", 1.0)),
             "poll_interval_seconds": int(os.getenv("POLL_INTERVAL_SECONDS", 10)),
             "slippage_tolerance_percent": float(
@@ -136,6 +166,11 @@ class ConfigManager:
                     os.getenv("DEVIATION_THRESHOLD", 0.05)
                 ),
             },
+            "batch": {
+                "enabled": os.getenv("BATCH_TRANSACTIONS_ENABLED", "false").lower()
+                == "true",
+                "multicall_address": os.getenv("MULTICALL_ADDRESS"),
+            },
         }
 
     def _build_config(self) -> AppConfig:
@@ -163,6 +198,11 @@ def _update_globals(cfg: AppConfig) -> None:
         "TOKEN1_ADDRESS": cfg.token1_address,
         "UNISWAP_V2_ROUTER": cfg.uniswap_v2_router,
         "SUSHISWAP_ROUTER": cfg.sushiswap_router,
+        "UNISWAP_V3_QUOTER": cfg.uniswap_v3_quoter,
+        "UNISWAP_V3_ROUTER": cfg.uniswap_v3_router,
+        "CURVE_POOL": cfg.curve_pool,
+        "BALANCER_VAULT": cfg.balancer_vault,
+        "BALANCER_POOL_ID": cfg.balancer_pool_id,
         "PROFIT_THRESHOLD": cfg.profit_threshold,
         "POLL_INTERVAL_SECONDS": cfg.poll_interval_seconds,
         "SLIPPAGE_TOLERANCE_PERCENT": cfg.slippage_tolerance_percent,
@@ -178,6 +218,8 @@ def _update_globals(cfg: AppConfig) -> None:
         "FLASHBOTS_URL": cfg.mev.flashbots_url,
         "FORK_RPC_URL": cfg.mev.fork_rpc_url,
         "DEVIATION_THRESHOLD": cfg.mev.deviation_threshold,
+        "BATCH_TRANSACTIONS_ENABLED": cfg.batch.enabled,
+        "MULTICALL_ADDRESS": cfg.batch.multicall_address,
     }
     globals().update(mapping)
 
@@ -192,6 +234,11 @@ TOKEN0_ADDRESS = cfg.token0_address
 TOKEN1_ADDRESS = cfg.token1_address
 UNISWAP_V2_ROUTER = cfg.uniswap_v2_router
 SUSHISWAP_ROUTER = cfg.sushiswap_router
+UNISWAP_V3_QUOTER = cfg.uniswap_v3_quoter
+UNISWAP_V3_ROUTER = cfg.uniswap_v3_router
+CURVE_POOL = cfg.curve_pool
+BALANCER_VAULT = cfg.balancer_vault
+BALANCER_POOL_ID = cfg.balancer_pool_id
 PROFIT_THRESHOLD = cfg.profit_threshold
 POLL_INTERVAL_SECONDS = cfg.poll_interval_seconds
 SLIPPAGE_TOLERANCE_PERCENT = cfg.slippage_tolerance_percent
@@ -207,6 +254,8 @@ MEV_PROTECTION_ENABLED = cfg.mev.enabled
 FLASHBOTS_URL = cfg.mev.flashbots_url
 FORK_RPC_URL = cfg.mev.fork_rpc_url
 DEVIATION_THRESHOLD = cfg.mev.deviation_threshold
+BATCH_TRANSACTIONS_ENABLED = cfg.batch.enabled
+MULTICALL_ADDRESS = cfg.batch.multicall_address
 
 __all__ = [
     "CONFIG_MANAGER",
@@ -217,6 +266,11 @@ __all__ = [
     "TOKEN1_ADDRESS",
     "UNISWAP_V2_ROUTER",
     "SUSHISWAP_ROUTER",
+    "UNISWAP_V3_QUOTER",
+    "UNISWAP_V3_ROUTER",
+    "CURVE_POOL",
+    "BALANCER_VAULT",
+    "BALANCER_POOL_ID",
     "PROFIT_THRESHOLD",
     "POLL_INTERVAL_SECONDS",
     "SLIPPAGE_TOLERANCE_PERCENT",
@@ -232,4 +286,6 @@ __all__ = [
     "FLASHBOTS_URL",
     "FORK_RPC_URL",
     "DEVIATION_THRESHOLD",
+    "BATCH_TRANSACTIONS_ENABLED",
+    "MULTICALL_ADDRESS",
 ]
