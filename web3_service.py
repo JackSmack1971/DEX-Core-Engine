@@ -27,7 +27,6 @@ from observability.decorators import log_and_measure
 
 logger = get_logger("web3_service")
 
-from observability.decorators import log_and_measure
 
 
 class TransactionFailedError(Exception):
