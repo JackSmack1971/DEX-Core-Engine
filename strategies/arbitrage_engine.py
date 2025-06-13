@@ -6,6 +6,9 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Dict, Iterable, List
 
+from cross_chain import BridgeProvider
+from dex_protocols.base import BaseDEXProtocol
+
 from routing import Router
 from strategies.base import BaseStrategy, StrategyConfig
 from logger import get_logger
@@ -32,14 +35,53 @@ class ArbitrageOpportunity:
 class OpportunityDetector:
     """Scan token pairs via ``Router`` for arbitrage opportunities."""
 
-    def __init__(self, router: Router, tokens: Iterable[str], amount: float = 1.0) -> None:
+    def __init__(
+        self,
+        router: Router,
+        tokens: Iterable[str],
+        amount: float = 1.0,
+        providers: Iterable[BridgeProvider] | None = None,
+    ) -> None:
         self.router = router
         self.tokens = list(tokens)
+        self.providers = list(providers or [])
         self.amount = amount
         self.logger = get_logger("opportunity_detector")
 
+    async def _check_slippage(self, price: float, amount: float) -> bool:
+        if not self.router.slippage_engine:
+            return True
+        try:
+            await self.router.slippage_engine.check(price, amount)
+            return True
+        except Exception:  # noqa: BLE001
+            return False
+
+    async def _evaluate_cycle(
+        self,
+        protocols: List[BaseDEXProtocol],
+        path: List[str],
+        base_cost: float,
+    ) -> ArbitrageOpportunity | None:
+        amt = self.amount
+        for idx, proto in enumerate(protocols):
+            quote = await proto.get_quote(path[idx], path[idx + 1], int(amt))
+            if not await self._check_slippage(quote, amt):
+                return None
+            amt = quote
+        total_cost = base_cost
+        for provider in self.providers:
+            try:
+                total_cost += await provider.get_price(path[-1], path[0])
+            except Exception as exc:  # noqa: BLE001
+                self.logger.error("bridge price error: %s", exc)
+        profit = amt - self.amount - total_cost
+        if profit > 0:
+            return ArbitrageOpportunity(ArbitrageType.TRIANGULAR, path, profit)
+        return None
+
     async def scan(self) -> List[ArbitrageOpportunity]:
-        """Return a list of simple opportunities between all token pairs."""
+        """Return a list of opportunities between all token pairs."""
         opportunities: List[ArbitrageOpportunity] = []
         for token_in in self.tokens:
             for token_out in self.tokens:
@@ -51,10 +93,21 @@ class OpportunityDetector:
                     profit = out2 - self.amount
                     if profit > 0:
                         opportunities.append(
-                            ArbitrageOpportunity(ArbitrageType.SIMPLE, [token_in, token_out, token_in], profit)
+                            ArbitrageOpportunity(
+                                ArbitrageType.SIMPLE,
+                                [token_in, token_out, token_in],
+                                profit,
+                            )
                         )
                 except Exception as exc:  # noqa: BLE001
                     self.logger.error("scan error: %s", exc)
+        for protocols, path, cost in self.router.find_triangular_cycles():
+            try:
+                opp = await self._evaluate_cycle(protocols, path, cost)
+                if opp:
+                    opportunities.append(opp)
+            except Exception as exc:  # noqa: BLE001
+                self.logger.error("cycle eval error: %s", exc)
         return opportunities
 
 

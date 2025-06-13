@@ -127,6 +127,37 @@ class Router:
             amt = await proto.get_quote(route[idx], route[idx + 1], int(amt))
         return amt
 
+    def find_triangular_cycles(
+        self,
+    ) -> List[Tuple[List[BaseDEXProtocol], List[str], float]]:
+        """Return all token cycles ``A->B->C->A`` with costs."""
+        cycles: List[Tuple[List[BaseDEXProtocol], List[str], float]] = []
+        seen: set[Tuple[str, str, str]] = set()
+        for token_a, edges_ab in self._graph.items():
+            for edge_ab in edges_ab:
+                token_b = edge_ab.token_out
+                if token_b == token_a:
+                    continue
+                for edge_bc in self._graph.get(token_b, []):
+                    token_c = edge_bc.token_out
+                    if token_c in {token_a, token_b}:
+                        continue
+                    for edge_ca in self._graph.get(token_c, []):
+                        if edge_ca.token_out != token_a:
+                            continue
+                        key = tuple(sorted([token_a, token_b, token_c]))
+                        if key in seen:
+                            continue
+                        seen.add(key)
+                        cycles.append(
+                            (
+                                [edge_ab.protocol, edge_bc.protocol, edge_ca.protocol],
+                                [token_a, token_b, token_c, token_a],
+                                edge_ab.cost + edge_bc.cost + edge_ca.cost,
+                            )
+                        )
+        return cycles
+
     async def _dynamic_slippage(
         self, proto: BaseDEXProtocol, hop: List[str], amount: int
     ) -> float:
