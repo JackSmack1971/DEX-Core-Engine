@@ -28,6 +28,13 @@ class DexError(BaseAppError):
         super().__init__("dex_error", message)
 
 
+class BatcherError(BaseAppError):
+    """Raised for errors during batched transactions."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__("batcher_error", message)
+
+
 class StrategyError(BaseAppError):
     """Raised for errors in strategy execution or setup."""
 
