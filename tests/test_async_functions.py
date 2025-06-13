@@ -56,14 +56,10 @@ async def test_get_price_error(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_arbitrage_run_once(monkeypatch):
-    dex1 = MagicMock()
-    dex2 = MagicMock()
-    dex1.router_address = "dex1"
-    dex2.router_address = "dex2"
-    dex1.get_price = AsyncMock(return_value=1.0)
-    dex2.get_price = AsyncMock(return_value=2.0)
+    router = MagicMock()
+    router.get_best_quote = AsyncMock(side_effect=[1.0, 2.0])
 
-    strategy = ArbitrageStrategy([dex1, dex2])
+    strategy = ArbitrageStrategy(router)
     strategy._check_profitability = MagicMock()
 
     async def stop_sleep(_):

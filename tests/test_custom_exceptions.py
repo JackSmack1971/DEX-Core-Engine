@@ -15,12 +15,13 @@ import pytest
 from exceptions import DexError, StrategyError
 from dex_handler import DEXHandler
 from web3_service import TransactionFailedError
+from routing import Router
 from strategy import ArbitrageStrategy
 
 
-def test_strategy_error_raised():
-    with pytest.raises(StrategyError):
-        ArbitrageStrategy([MagicMock()])
+def test_strategy_initializes_without_error():
+    router = Router([])
+    assert isinstance(ArbitrageStrategy(router), ArbitrageStrategy)
 
 
 def test_execute_swap_raises_dex_error():
