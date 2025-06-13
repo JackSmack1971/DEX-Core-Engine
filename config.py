@@ -67,6 +67,13 @@ class SlippageProtectionSettings(BaseModel):
     max_slippage_bps: int = Field(50, ge=0)
 
 
+class PortfolioSettings(BaseModel):
+    """Portfolio management parameters."""
+
+    rebalance_threshold: float = Field(0.05, ge=0, le=1)
+    max_assets: int = Field(20, ge=1)
+
+
 class AppConfig(BaseModel):
     """Validated application configuration."""
 
@@ -91,6 +98,7 @@ class AppConfig(BaseModel):
     mev: MevProtectionSettings
     batch: BatchSettings
     slippage_protection: SlippageProtectionSettings
+    portfolio: PortfolioSettings
 
     @validator(
         "wallet_address",
@@ -186,6 +194,12 @@ class ConfigManager:
                 == "true",
                 "max_slippage_bps": int(os.getenv("MAX_SLIPPAGE_BPS", 50)),
             },
+            "portfolio": {
+                "rebalance_threshold": float(
+                    os.getenv("REBALANCE_THRESHOLD", 0.05)
+                ),
+                "max_assets": int(os.getenv("MAX_PORTFOLIO_ASSETS", 20)),
+            },
         }
 
     def _build_config(self) -> AppConfig:
@@ -237,6 +251,8 @@ def _update_globals(cfg: AppConfig) -> None:
         "MULTICALL_ADDRESS": cfg.batch.multicall_address,
         "DYNAMIC_SLIPPAGE_ENABLED": cfg.slippage_protection.dynamic_slippage_enabled,
         "MAX_SLIPPAGE_BPS": cfg.slippage_protection.max_slippage_bps,
+        "REBALANCE_THRESHOLD": cfg.portfolio.rebalance_threshold,
+        "MAX_PORTFOLIO_ASSETS": cfg.portfolio.max_assets,
     }
     globals().update(mapping)
 
@@ -275,6 +291,8 @@ BATCH_TRANSACTIONS_ENABLED = cfg.batch.enabled
 MULTICALL_ADDRESS = cfg.batch.multicall_address
 DYNAMIC_SLIPPAGE_ENABLED = cfg.slippage_protection.dynamic_slippage_enabled
 MAX_SLIPPAGE_BPS = cfg.slippage_protection.max_slippage_bps
+REBALANCE_THRESHOLD = cfg.portfolio.rebalance_threshold
+MAX_PORTFOLIO_ASSETS = cfg.portfolio.max_assets
 
 __all__ = [
     "CONFIG_MANAGER",
@@ -309,4 +327,6 @@ __all__ = [
     "MULTICALL_ADDRESS",
     "DYNAMIC_SLIPPAGE_ENABLED",
     "MAX_SLIPPAGE_BPS",
+    "REBALANCE_THRESHOLD",
+    "MAX_PORTFOLIO_ASSETS",
 ]
