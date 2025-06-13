@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from prometheus_client import Counter, Histogram
+from prometheus_client import Counter, Histogram, Gauge
 
 TRADE_COUNT = Counter('trade_count_total', 'Number of trades executed')
 TRADE_SUCCESS = Counter('trade_success_total', 'Number of successful trades')
@@ -22,6 +22,8 @@ RISK_ADJUSTED_PROFIT = Histogram(
     'risk_adjusted_profit',
     'Risk-adjusted profit from optimizer',
 )
+PORTFOLIO_VALUE = Gauge('portfolio_value', 'Total portfolio value')
+REBALANCE_COUNT = Counter('portfolio_rebalance_total', 'Number of portfolio rebalances')
 __all__ = [
     'TRADE_COUNT',
     'TRADE_SUCCESS',
@@ -32,4 +34,6 @@ __all__ = [
     'OPTIMIZATION_RUNS',
     'OPTIMIZATION_FAILURES',
     'RISK_ADJUSTED_PROFIT',
+    'PORTFOLIO_VALUE',
+    'REBALANCE_COUNT',
 ]
