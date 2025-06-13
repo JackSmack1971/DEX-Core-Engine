@@ -2,7 +2,13 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from exceptions import DexError
+from exceptions import DexError, ServiceUnavailableError
+from dex_protocols.base import LiquidityInfo
+from slippage_protection import (
+    MarketConditions,
+    SlippageParams,
+    SlippageProtectionEngine,
+)
 from routing import Router
 
 
@@ -16,6 +22,10 @@ class DummyProto:
         service.web3.eth.gas_price = 1
         self.web3_service = service
         self.gas_limit = 1
+        self.liq = LiquidityInfo(liquidity=100.0, price_impact=2.0)
+
+    async def get_liquidity_info(self, *_: str) -> LiquidityInfo:
+        return self.liq
 
 
 @pytest.mark.asyncio
@@ -62,4 +72,34 @@ async def test_route_cache(monkeypatch):
     monkeypatch.setattr(router, "_current_block", lambda: 2)
     await router.get_best_route("a", "b", 1)
     assert path_mock.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_execute_split_on_high_slippage(monkeypatch):
+    p1 = DummyProto([("a", "b", 1)], "p1")
+    router = Router([p1])
+    router.slippage_engine = SlippageProtectionEngine(SlippageParams(1.0, None))
+    monkeypatch.setattr(
+        router.slippage_engine,
+        "get_market_conditions",
+        AsyncMock(return_value=MarketConditions(100.0, 100.0, 0.0)),
+    )
+    p1.liq = LiquidityInfo(liquidity=100.0, price_impact=5.0)
+    await router.execute_swap(4, "a", "b")
+    assert p1.execute_swap.await_count >= 2
+
+
+@pytest.mark.asyncio
+async def test_fallback_to_static_slippage(monkeypatch):
+    p1 = DummyProto([("a", "b", 1)], "p1")
+    router = Router([p1])
+    router.slippage_engine = SlippageProtectionEngine(SlippageParams(1.0, None))
+
+    async def fail() -> MarketConditions:
+        raise ServiceUnavailableError("fail")
+
+    monkeypatch.setattr(router.slippage_engine, "get_market_conditions", AsyncMock(side_effect=fail))
+    p1.liq = LiquidityInfo(liquidity=100.0, price_impact=0.0)
+    await router.execute_swap(2, "a", "b")
+    assert p1.execute_swap.await_count == 1
 

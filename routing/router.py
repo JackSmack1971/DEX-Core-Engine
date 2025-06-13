@@ -5,8 +5,12 @@ import time
 from dataclasses import dataclass
 from typing import Dict, Iterable, List, Tuple
 
+import os
+
 from dex_protocols.base import BaseDEXProtocol
 from exceptions import DexError
+import config
+from slippage_protection import SlippageParams, SlippageProtectionEngine
 from logger import get_logger
 
 
@@ -24,11 +28,21 @@ logger = get_logger("router")
 class Router:
     """Aggregate multiple DEX protocol adapters with multi-hop logic."""
 
-    def __init__(self, protocols: Iterable[BaseDEXProtocol], ttl: int = 30) -> None:
+    def __init__(
+        self, protocols: Iterable[BaseDEXProtocol], ttl: int = 30
+    ) -> None:
         self.protocols: List[BaseDEXProtocol] = list(protocols)
         self._graph: Dict[str, List[_Edge]] = {}
-        self._cache: Dict[Tuple[str, str, int], Tuple[List[BaseDEXProtocol], List[str], float]] = {}
+        self._cache: Dict[
+            Tuple[str, str, int],
+            Tuple[List[BaseDEXProtocol], List[str], float],
+        ] = {}
         self._ttl = ttl
+        self.slippage_engine = None
+        if config.DYNAMIC_SLIPPAGE_ENABLED:
+            api = os.getenv("MARKET_DATA_URL")
+            params = SlippageParams(config.SLIPPAGE_TOLERANCE_PERCENT, api)
+            self.slippage_engine = SlippageProtectionEngine(params)
         self._build_graph()
 
     def add_protocol(self, protocol: BaseDEXProtocol) -> None:
@@ -108,24 +122,61 @@ class Router:
         self, token_in: str, token_out: str, amount_in: int
     ) -> float:
         """Return the estimated output amount for the optimal path."""
-        protocols, route = await self.get_best_route(token_in, token_out, amount_in)
+        protocols, route = await self.get_best_route(
+            token_in, token_out, amount_in
+        )
         amt = float(amount_in)
         for idx, proto in enumerate(protocols):
             amt = await proto.get_quote(route[idx], route[idx + 1], int(amt))
         return amt
 
+    async def _dynamic_slippage(
+        self, proto: BaseDEXProtocol, hop: List[str], amount: int
+    ) -> float:
+        try:
+            info = await proto.get_liquidity_info(hop[0], hop[1], amount)
+            if self.slippage_engine:
+                market = await self.slippage_engine.get_market_conditions()
+                return info.price_impact * (1 + market.volatility)
+            return info.price_impact
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Slippage data unavailable: %s", exc)
+            return 0.0
+
     async def execute_swap(
         self, amount_in: int, token_in: str, token_out: str
     ) -> str:
         """Execute sequential swaps along the optimal path."""
-        protocols, route = await self.get_best_route(token_in, token_out, amount_in)
+        protocols, route = await self.get_best_route(
+            token_in, token_out, amount_in
+        )
         amt = amount_in
         tx = ""
         for idx, proto in enumerate(protocols):
             hop = [route[idx], route[idx + 1]]
-            logger.info(
-                "Executing hop via %s: %s", proto.__class__.__name__, " -> ".join(hop)
-            )
-            tx = await proto.execute_swap(amt, hop)
-            amt = await proto.get_quote(hop[0], hop[1], amt)
+            remaining = amt
+            total_out = 0
+            while remaining > 0:
+                part = remaining
+                for _ in range(4):
+                    slip = await self._dynamic_slippage(proto, hop, part)
+                    tolerance = (
+                        self.slippage_engine.params.tolerance_percent
+                        if self.slippage_engine
+                        else config.SLIPPAGE_TOLERANCE_PERCENT
+                    )
+                    if slip <= tolerance or part <= 1:
+                        break
+                    part //= 2
+                hop_str = " -> ".join(hop)
+                logger.info(
+                    "Executing hop via %s: %s",
+                    proto.__class__.__name__,
+                    hop_str,
+                )
+                tx = await proto.execute_swap(part, hop)
+                out_amt = await proto.get_quote(hop[0], hop[1], part)
+                total_out += out_amt
+                remaining -= part
+            amt = int(total_out)
         return tx

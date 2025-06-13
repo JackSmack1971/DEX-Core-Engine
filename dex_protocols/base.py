@@ -1,12 +1,21 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from typing import List
 
 from exceptions import DexError, ServiceUnavailableError
 from logger import get_logger
 from utils.circuit_breaker import CircuitBreaker
 from utils.retry import retry_async
+
+
+@dataclass
+class LiquidityInfo:
+    """Information about pair liquidity and price impact."""
+
+    liquidity: float
+    price_impact: float
 
 
 class BaseDEXProtocol(ABC):
@@ -91,5 +100,11 @@ class BaseDEXProtocol(ABC):
     ) -> List[str]:
         """Compute the best swap route."""
 
+    async def get_liquidity_info(
+        self, token_in: str, token_out: str, amount_in: int
+    ) -> LiquidityInfo:
+        """Return liquidity and price impact for ``amount_in``."""
+        return LiquidityInfo(0.0, 0.0)
 
-__all__ = ["BaseDEXProtocol"]
+
+__all__ = ["BaseDEXProtocol", "LiquidityInfo"]
