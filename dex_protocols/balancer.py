@@ -6,7 +6,7 @@ from typing import Any, Dict, List
 
 from web3.contract import Contract
 
-from dex_protocols.base import BaseDEXProtocol
+from dex_protocols.base import BaseDEXProtocol, LiquidityInfo
 from exceptions import DexError
 from tokens.detect import (
     ERC20_ABI,
@@ -138,6 +138,15 @@ class Balancer(BaseDEXProtocol):
         self, token_in: str, token_out: str, amount_in: int
     ) -> List[str]:
         return [token_in, token_out]
+
+    async def get_liquidity_info(
+        self, token_in: str, token_out: str, amount_in: int
+    ) -> LiquidityInfo:
+        small = await self._get_quote(token_in, token_out, 1)
+        large = await self._get_quote(token_in, token_out, amount_in)
+        expected = small * amount_in
+        impact = 0.0 if expected == 0 else abs(expected - large) / expected * 100
+        return LiquidityInfo(liquidity=float(amount_in) * 10, price_impact=impact)
 
 
 __all__ = ["Balancer"]
