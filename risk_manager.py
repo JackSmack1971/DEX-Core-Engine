@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import math
 from collections import deque
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Deque, Dict, List
 
 import config
@@ -25,6 +25,18 @@ class Position:
     take_profit: float
 
 
+@dataclass
+class InventoryItem:
+    """Track token balance and valuation."""
+
+    balance: float = 0.0
+    price: float = 0.0
+
+    @property
+    def value(self) -> float:
+        return self.balance * self.price
+
+
 class RiskManager:
     """Evaluate and track trade risk.
 
@@ -40,7 +52,7 @@ class RiskManager:
         self.high_water = self.equity
         self.positions: List[Position] = []
         self.returns: Deque[float] = deque(maxlen=100)
-        self.inventory: Dict[str, float] = {}
+        self.inventory: Dict[str, InventoryItem] = {}
 
     def position_size(self, balance: float, risk_per_trade: float) -> float:
         """Compute position size using fixed fractional/Kelly."""
@@ -97,19 +109,66 @@ class RiskManager:
         """Increase inventory for ``token``."""
         if amount < 0:
             raise InventoryError("amount must be non-negative")
-        self.inventory[token] = self.inventory.get(token, 0.0) + amount
+        item = self.inventory.get(token)
+        if item is None:
+            self.inventory[token] = InventoryItem(balance=amount)
+        else:
+            item.balance += amount
 
     def remove_inventory(self, token: str, amount: float) -> None:
         """Decrease inventory for ``token``."""
         if amount < 0:
             raise InventoryError("amount must be non-negative")
-        if self.inventory.get(token, 0.0) < amount:
+        item = self.inventory.get(token)
+        if not item or item.balance < amount:
             raise InventoryError("insufficient inventory")
-        self.inventory[token] -= amount
+        item.balance -= amount
 
     def get_inventory(self, token: str) -> float:
         """Return stored amount of ``token``."""
-        return self.inventory.get(token, 0.0)
+        item = self.inventory.get(token)
+        return item.balance if item else 0.0
+
+    def set_price(self, token: str, price: float) -> None:
+        """Update tracked price for ``token``."""
+        if price <= 0:
+            raise InventoryError("price must be positive")
+        item = self.inventory.get(token)
+        if item is None:
+            self.inventory[token] = InventoryItem(price=price)
+        else:
+            item.price = price
+
+    def inventory_value(self) -> float:
+        """Return total inventory valuation."""
+        return sum(item.value for item in self.inventory.values())
+
+    def rebalance_inventory(self, token0: str, token1: str, target_ratio: float) -> None:
+        """Rebalance two tokens to achieve desired value ratio."""
+        if target_ratio <= 0:
+            raise InventoryError("target_ratio must be positive")
+        item0 = self.inventory.get(token0)
+        item1 = self.inventory.get(token1)
+        if not item0 or not item1:
+            raise InventoryError("tokens missing")
+        total = item0.value + item1.value
+        desired0 = total * target_ratio / (1 + target_ratio)
+        desired1 = total - desired0
+        item0.balance = desired0 / item0.price
+        item1.balance = desired1 / item1.price
+
+    def hedge_impermanent_loss(
+        self, token0: str, token1: str, initial_price: float, current_price: float
+    ) -> float:
+        """Hedge impermanent loss by rebalancing inventory."""
+        loss = self.impermanent_loss(
+            initial_price,
+            current_price,
+            self.get_inventory(token0),
+            self.get_inventory(token1),
+        )
+        self.rebalance_inventory(token0, token1, 1.0)
+        return loss
 
     def impermanent_loss(
         self, initial_price: float, current_price: float, amount0: float, amount1: float
@@ -151,5 +210,5 @@ class RiskManager:
         logger.critical("Emergency shutdown activated")
 
 
-__all__ = ["RiskManager", "Position"]
+__all__ = ["RiskManager", "Position", "InventoryItem"]
 
