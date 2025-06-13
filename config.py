@@ -36,6 +36,15 @@ class DexSettings(BaseModel):
     tx_timeout: int = Field(..., gt=0)
 
 
+class MevProtectionSettings(BaseModel):
+    """Configuration for MEV protection features."""
+
+    enabled: bool = Field(False)
+    flashbots_url: str | None = None
+    fork_rpc_url: str | None = None
+    deviation_threshold: float = Field(0.05, ge=0)
+
+
 class AppConfig(BaseModel):
     """Validated application configuration."""
 
@@ -52,6 +61,7 @@ class AppConfig(BaseModel):
     trading: TradingSettings
     risk: RiskSettings
     dex: DexSettings
+    mev: MevProtectionSettings
 
     @validator(
         "wallet_address",
@@ -117,6 +127,15 @@ class ConfigManager:
                 "gas_limit": int(os.getenv("GAS_LIMIT", 250_000)),
                 "tx_timeout": int(os.getenv("TX_TIMEOUT", 120)),
             },
+            "mev": {
+                "enabled": os.getenv("MEV_PROTECTION_ENABLED", "false").lower()
+                == "true",
+                "flashbots_url": os.getenv("FLASHBOTS_URL"),
+                "fork_rpc_url": os.getenv("FORK_RPC_URL"),
+                "deviation_threshold": float(
+                    os.getenv("DEVIATION_THRESHOLD", 0.05)
+                ),
+            },
         }
 
     def _build_config(self) -> AppConfig:
@@ -155,6 +174,10 @@ def _update_globals(cfg: AppConfig) -> None:
         "TAKE_PROFIT_PERCENT": cfg.risk.take_profit_percent,
         "GAS_LIMIT": cfg.dex.gas_limit,
         "TX_TIMEOUT": cfg.dex.tx_timeout,
+        "MEV_PROTECTION_ENABLED": cfg.mev.enabled,
+        "FLASHBOTS_URL": cfg.mev.flashbots_url,
+        "FORK_RPC_URL": cfg.mev.fork_rpc_url,
+        "DEVIATION_THRESHOLD": cfg.mev.deviation_threshold,
     }
     globals().update(mapping)
 
@@ -180,6 +203,10 @@ STOP_LOSS_PERCENT = cfg.risk.stop_loss_percent
 TAKE_PROFIT_PERCENT = cfg.risk.take_profit_percent
 GAS_LIMIT = cfg.dex.gas_limit
 TX_TIMEOUT = cfg.dex.tx_timeout
+MEV_PROTECTION_ENABLED = cfg.mev.enabled
+FLASHBOTS_URL = cfg.mev.flashbots_url
+FORK_RPC_URL = cfg.mev.fork_rpc_url
+DEVIATION_THRESHOLD = cfg.mev.deviation_threshold
 
 __all__ = [
     "CONFIG_MANAGER",
@@ -201,4 +228,8 @@ __all__ = [
     "TAKE_PROFIT_PERCENT",
     "GAS_LIMIT",
     "TX_TIMEOUT",
+    "MEV_PROTECTION_ENABLED",
+    "FLASHBOTS_URL",
+    "FORK_RPC_URL",
+    "DEVIATION_THRESHOLD",
 ]

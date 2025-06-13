@@ -49,3 +49,10 @@ class ServiceUnavailableError(BaseAppError):
         super().__init__("service_unavailable", message)
 
 
+
+
+class PriceManipulationError(BaseAppError):
+    """Raised when transaction simulation detects price manipulation."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__("price_manipulation", message)
