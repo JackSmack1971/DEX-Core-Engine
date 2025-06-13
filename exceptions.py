@@ -42,6 +42,13 @@ class StrategyError(BaseAppError):
         super().__init__("strategy_error", message)
 
 
+class InventoryError(BaseAppError):
+    """Raised for inventory management issues."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__("inventory_error", message)
+
+
 class RateLimitError(BaseAppError):
     """Raised when a client exceeds allowed request rate."""
 
