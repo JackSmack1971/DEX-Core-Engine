@@ -8,6 +8,14 @@ from web3.contract import Contract
 
 from dex_protocols.base import BaseDEXProtocol
 from exceptions import DexError
+from tokens.detect import (
+    ERC20_ABI,
+    TokenInspectionError,
+    TokenType,
+    detect_token_type,
+    gas_multiplier,
+    get_token_balance,
+)
 from web3_service import Web3Service
 
 
@@ -96,16 +104,31 @@ class Balancer(BaseDEXProtocol):
             "toInternalBalance": False,
         }
         try:
+            contract = self.web3_service.get_contract(token_out, ERC20_ABI)
+            try:
+                token_type = await detect_token_type(contract)
+            except TokenInspectionError:
+                token_type = TokenType.ERC20
+            multiplier = gas_multiplier(token_type)
+            balance_before = await get_token_balance(
+                contract, self.web3_service.account.address
+            )
+
             tx = self.vault.functions.swap(
                 single_swap, funds, 0, int(time.time()) + 300
             ).build_transaction(
                 {
                     "from": self.web3_service.account.address,
-                    "gas": self.gas_limit,
+                    "gas": int(self.gas_limit * multiplier),
                     "gasPrice": self.web3_service.web3.eth.gas_price,
                 }
             )
             receipt = await self.web3_service.sign_and_send_transaction(tx)
+            balance_after = await get_token_balance(
+                contract, self.web3_service.account.address
+            )
+            if balance_after <= balance_before:
+                raise DexError("token balance check failed")
             return receipt["transactionHash"].hex()
         except Exception as exc:  # noqa: BLE001
             self.logger.error("Balancer swap error: %s", exc)

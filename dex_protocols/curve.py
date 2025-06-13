@@ -7,6 +7,14 @@ from web3.contract import Contract
 
 from dex_protocols.base import BaseDEXProtocol
 from exceptions import DexError
+from tokens.detect import (
+    ERC20_ABI,
+    TokenInspectionError,
+    TokenType,
+    detect_token_type,
+    gas_multiplier,
+    get_token_balance,
+)
 from web3_service import Web3Service
 
 
@@ -74,15 +82,31 @@ class Curve(BaseDEXProtocol):
 
     async def _execute_swap(self, amount_in: int, route: List[str]) -> str:
         try:
-            i, j = self._idx(route[0]), self._idx(route[-1])
+            token_out = route[-1]
+            contract = self.web3_service.get_contract(token_out, ERC20_ABI)
+            try:
+                token_type = await detect_token_type(contract)
+            except TokenInspectionError:
+                token_type = TokenType.ERC20
+            multiplier = gas_multiplier(token_type)
+            balance_before = await get_token_balance(
+                contract, self.web3_service.account.address
+            )
+
+            i, j = self._idx(route[0]), self._idx(token_out)
             tx = self.pool.functions.exchange(i, j, amount_in, 0).build_transaction(
                 {
                     "from": self.web3_service.account.address,
-                    "gas": self.gas_limit,
+                    "gas": int(self.gas_limit * multiplier),
                     "gasPrice": self.web3_service.web3.eth.gas_price,
                 }
             )
             receipt = await self.web3_service.sign_and_send_transaction(tx)
+            balance_after = await get_token_balance(
+                contract, self.web3_service.account.address
+            )
+            if balance_after <= balance_before:
+                raise DexError("token balance check failed")
             return receipt["transactionHash"].hex()
         except DexError:
             raise

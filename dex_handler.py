@@ -23,6 +23,14 @@ from web3_service import (
 from exceptions import DexError, ServiceUnavailableError
 from utils.circuit_breaker import CircuitBreaker
 from utils.retry import retry_async
+from tokens.detect import (
+    ERC20_ABI,
+    TokenInspectionError,
+    TokenType,
+    detect_token_type,
+    gas_multiplier,
+    get_token_balance,
+)
 from logger import get_logger
 from observability.decorators import log_and_measure
 from observability.metrics import TRADE_COUNT, TRADE_SUCCESS
@@ -114,7 +122,17 @@ class DEXHandler:
     async def _do_swap(self, amount_in_wei: int, path: List[str]) -> str:
         amount_out_min = 0
         to_address = self.web3_service.account.address
-        deadline = int(time.time()) + 60 * 5
+        deadline = int(time.time()) + 300
+
+        token_out = path[-1]
+        contract = self.web3_service.get_contract(token_out, ERC20_ABI)
+        try:
+            token_type = await detect_token_type(contract)
+        except TokenInspectionError:
+            token_type = TokenType.ERC20
+        multiplier = gas_multiplier(token_type)
+        balance_before = await get_token_balance(contract, to_address)
+
         tx_params = self.contract.functions.swapExactETHForTokens(
             amount_out_min,
             path,
@@ -124,11 +142,14 @@ class DEXHandler:
             {
                 "from": to_address,
                 "value": amount_in_wei,
-                "gas": 250000,
+                "gas": int(250000 * multiplier),
                 "gasPrice": self.web3_service.web3.eth.gas_price,
             }
         )
         receipt = await self.web3_service.sign_and_send_transaction(tx_params)
+        balance_after = await get_token_balance(contract, to_address)
+        if balance_after <= balance_before:
+            raise DexError("token balance check failed")
         return receipt["transactionHash"].hex()
 
     async def execute_swap(
