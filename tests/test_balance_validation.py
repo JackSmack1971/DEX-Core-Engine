@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from dex_handler import DEXHandler
+from slippage_protection import SlippageProtectionEngine
 from exceptions import DexError
 from tokens import detect
 
@@ -16,6 +17,24 @@ async def test_balance_check_failure(monkeypatch):
     handler.web3_service.account = MagicMock(address="0xabc")
     handler.web3_service.web3 = MagicMock(eth=MagicMock(gas_price=1))
     handler._circuit = MagicMock(call=lambda f, *a, **kw: f(*a, **kw))
+
+    handler.contract.functions.getAmountsOut = MagicMock(
+        return_value=MagicMock(call=MagicMock(return_value=[1, 2]))
+    )
+    async def fake_thread(func, *a, **kw):
+        return func()
+
+    monkeypatch.setattr(asyncio, "to_thread", fake_thread)
+    monkeypatch.setattr(
+        SlippageProtectionEngine,
+        "calculate_protected_slippage",
+        lambda amt: 1,
+    )
+    monkeypatch.setattr(
+        SlippageProtectionEngine,
+        "validate_transaction_slippage",
+        lambda *a, **kw: None,
+    )
 
     swap_func = MagicMock(return_value=MagicMock(build_transaction=MagicMock(return_value={"tx": 1})))
     handler.contract.functions.swapExactETHForTokens = swap_func

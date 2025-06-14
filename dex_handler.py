@@ -31,6 +31,7 @@ from tokens.detect import (
     gas_multiplier,
     get_token_balance,
 )
+from slippage_protection import SlippageProtectionEngine
 from logger import get_logger
 from observability.decorators import log_and_measure
 from observability.metrics import TRADE_COUNT, TRADE_SUCCESS
@@ -119,12 +120,12 @@ class DEXHandler:
             return 0.0
 
     @log_and_measure("dex_handler", warn_ms=5000)
-    async def _do_swap(self, amount_in_wei: int, path: List[str]) -> str:
-        amount_out_min = 0
+    async def _do_swap(
+        self, amount_in_wei: int, path: List[str], amount_out_min: int
+    ) -> str:
         to_address = self.web3_service.account.address
-        deadline = int(time.time()) + 300
-
         token_out = path[-1]
+        deadline = int(time.time()) + 300
         contract = self.web3_service.get_contract(token_out, ERC20_ABI)
         try:
             token_type = await detect_token_type(contract)
@@ -132,26 +133,23 @@ class DEXHandler:
             token_type = TokenType.ERC20
         multiplier = gas_multiplier(token_type)
         balance_before = await get_token_balance(contract, to_address)
-
-        tx_params = self.contract.functions.swapExactETHForTokens(
-            amount_out_min,
-            path,
-            to_address,
-            deadline,
-        ).build_transaction(
-            {
-                "from": to_address,
-                "value": amount_in_wei,
-                "gas": int(250000 * multiplier),
-                "gasPrice": self.web3_service.web3.eth.gas_price,
-            }
+        tx_params = (
+            self.contract.functions.swapExactETHForTokens(
+                amount_out_min, path, to_address, deadline
+            ).build_transaction(
+                {
+                    "from": to_address,
+                    "value": amount_in_wei,
+                    "gas": int(250000 * multiplier),
+                    "gasPrice": self.web3_service.web3.eth.gas_price,
+                }
+            )
         )
         receipt = await self.web3_service.sign_and_send_transaction(tx_params)
         balance_after = await get_token_balance(contract, to_address)
         if balance_after <= balance_before:
             raise DexError("token balance check failed")
         return receipt["transactionHash"].hex()
-
     async def execute_swap(
         self,
         amount_in_wei: int,
@@ -159,11 +157,22 @@ class DEXHandler:
     ) -> str:
         """Execute swap with circuit breaker and retry logic."""
         try:
+            amounts = await asyncio.to_thread(
+                self.contract.functions.getAmountsOut(amount_in_wei, path).call
+            )
+            expected_out = int(amounts[-1])
+            amount_out_min = SlippageProtectionEngine.calculate_protected_slippage(
+                expected_out
+            )
+            SlippageProtectionEngine.validate_transaction_slippage(
+                expected_out, amount_out_min
+            )
             tx_hash = await self._circuit.call(
                 retry_async,
                 self._do_swap,
                 amount_in_wei,
                 path,
+                amount_out_min,
             )
             TRADE_COUNT.inc()
             TRADE_SUCCESS.inc()
