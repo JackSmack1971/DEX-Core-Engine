@@ -1,4 +1,5 @@
 from risk_manager import RiskManager
+import pytest
 
 
 def test_position_size_fixed_fractional():
@@ -33,4 +34,32 @@ def test_shutdown_clears_positions():
     rm.add_position(100.0, 1000.0, 0.02)
     rm.shutdown()
     assert not rm.positions
+
+
+def test_update_equity_updates_metrics():
+    rm = RiskManager()
+    rm.update_equity(0.1)
+    from analytics.metrics import (
+        ANALYTICS_PNL,
+        ROLLING_PERFORMANCE_7D,
+        ROLLING_PERFORMANCE_30D,
+    )
+
+    for _ in range(6):
+        rm.update_equity(0.1)
+    for _ in range(23):
+        rm.update_equity(0.1)
+    assert ANALYTICS_PNL._value.get() == pytest.approx(3.0)
+    assert ROLLING_PERFORMANCE_7D._value.get() == pytest.approx(0.1)
+    assert ROLLING_PERFORMANCE_30D._value.get() == pytest.approx(0.1)
+
+
+def test_check_drawdown_sets_metric():
+    rm = RiskManager()
+    rm.update_equity(-0.2)
+    from analytics.metrics import ANALYTICS_DRAWDOWN
+
+    rm.check_drawdown()
+    dd = 1 - rm.equity / rm.high_water
+    assert ANALYTICS_DRAWDOWN._value.get() == pytest.approx(-dd)
 

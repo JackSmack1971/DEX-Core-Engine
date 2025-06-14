@@ -1,4 +1,5 @@
 import pytest
+from typing import List
 
 from dex_protocols.base import LiquidityInfo
 from risk_manager import PortfolioRiskManager, PortfolioSnapshot
@@ -46,6 +47,7 @@ def test_snapshot_contains_state():
     assert isinstance(snap, PortfolioSnapshot)
     assert snap.equity == rm.equity
     assert snap.inventory["a"].balance == 1
+    assert len(rm.snapshots) == 1
 
 
 def test_risk_budget():
@@ -71,3 +73,16 @@ async def test_liquidity_check():
     assert await rm.check_liquidity("a", "b", 50) is True
     router.proto.liq = LiquidityInfo(liquidity=1.0, price_impact=0.0)
     assert await rm.check_liquidity("a", "b", 50) is False
+
+
+def test_snapshot_hook_called():
+    router = DummyRouter()
+    rm = PortfolioRiskManager(router)
+    called: List[PortfolioSnapshot] = []
+
+    def hook(s: PortfolioSnapshot) -> None:
+        called.append(s)
+
+    rm.register_snapshot_hook(hook)
+    rm.snapshot()
+    assert called

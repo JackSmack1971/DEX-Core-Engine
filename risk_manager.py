@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 from collections import deque
 from dataclasses import dataclass, field
-from typing import Deque, Dict, List, Any
+from typing import Deque, Dict, List, Any, Callable
 import time
 import copy
 
@@ -71,6 +71,9 @@ class RiskManager:
         self.positions: List[Position] = []
         self.returns: Deque[float] = deque(maxlen=100)
         self.inventory: Dict[str, InventoryItem] = {}
+        self.snapshots: Deque[PortfolioSnapshot] = deque(maxlen=100)
+        self._snapshot_hooks: List[Callable[[PortfolioSnapshot], None]] = []
+        self._rolling_hooks: List[Callable[[List[float]], None]] = []
 
     def position_size(self, balance: float, risk_per_trade: float) -> float:
         """Compute position size using fixed fractional/Kelly."""
@@ -83,16 +86,46 @@ class RiskManager:
         logger.info("Position size %.4f", size)
         return min(size, config.MAX_POSITION_SIZE)
 
+    def register_snapshot_hook(self, hook: Callable[[PortfolioSnapshot], None]) -> None:
+        self._snapshot_hooks.append(hook)
+
+    def register_rolling_hook(self, hook: Callable[[List[float]], None]) -> None:
+        self._rolling_hooks.append(hook)
+
+    def _update_rolling_metrics(self) -> None:
+        from analytics.metrics import (
+            ROLLING_PERFORMANCE_7D,
+            ROLLING_PERFORMANCE_30D,
+        )
+
+        returns = list(self.returns)
+        if len(returns) >= 7:
+            ROLLING_PERFORMANCE_7D.set(sum(returns[-7:]) / 7)
+        if len(returns) >= 30:
+            ROLLING_PERFORMANCE_30D.set(sum(returns[-30:]) / 30)
+        for hook in self._rolling_hooks:
+            try:
+                hook(returns)
+            except Exception as exc:  # noqa: BLE001
+                logger.error("Rolling hook failed: %s", exc)
+
     def update_equity(self, pnl: float) -> None:
         """Record profit or loss."""
+        from analytics.metrics import ANALYTICS_PNL
+
         self.equity += pnl
         self.high_water = max(self.high_water, self.equity)
         self.returns.append(pnl)
+        ANALYTICS_PNL.set(sum(self.returns))
+        self._update_rolling_metrics()
         logger.debug("Equity updated to %.4f", self.equity)
 
     def check_drawdown(self) -> bool:
         """Return True if drawdown exceeds limit."""
+        from analytics.metrics import ANALYTICS_DRAWDOWN
+
         dd = 1 - self.equity / self.high_water
+        ANALYTICS_DRAWDOWN.set(-dd)
         if dd >= self.max_drawdown:
             logger.error("Drawdown %.2f exceeded", dd)
             return True
@@ -303,12 +336,19 @@ class PortfolioRiskManager(RiskManager):
         return loss
 
     def snapshot(self) -> PortfolioSnapshot:
-        return PortfolioSnapshot(
+        snap = PortfolioSnapshot(
             time.time(),
             self.equity,
             copy.deepcopy(self.inventory),
             list(self.positions),
         )
+        self.snapshots.append(snap)
+        for hook in self._snapshot_hooks:
+            try:
+                hook(snap)
+            except Exception as exc:  # noqa: BLE001
+                logger.error("Snapshot hook failed: %s", exc)
+        return snap
 
 
 __all__ = [
