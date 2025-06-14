@@ -25,8 +25,12 @@ def test_report_endpoint_valid():
 
 def test_report_endpoint_invalid():
     headers = {"Authorization": f"Bearer {_token()}"}
-    resp = client.get("/analytics/report", params={"period": "yearly"}, headers=headers)
-    assert resp.status_code == 503
+    resp = client.get(
+        "/analytics/report",
+        params={"period": "invalid_period"},
+        headers=headers,
+    )
+    assert resp.status_code == 400
 
 
 def test_performance_endpoint():
@@ -43,7 +47,7 @@ def test_performance_endpoint():
 def test_performance_invalid_confidence():
     headers = {"Authorization": f"Bearer {_token()}"}
     resp = client.get("/analytics/performance", params={"confidence": 1.5}, headers=headers)
-    assert resp.status_code == 503
+    assert resp.status_code == 400
 
 
 def test_unauthorized_access():

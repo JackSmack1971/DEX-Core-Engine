@@ -62,6 +62,7 @@ def _token(role: UserRole = UserRole.ADMIN) -> str:
 
 def test_metrics_endpoint():
     client = TestClient(app)
+    RateLimiterMiddleware.get_instance().reset()
     headers = {"Authorization": f"Bearer {_token()}"}
     response = client.get("/metrics", headers=headers)
     assert response.status_code == 200

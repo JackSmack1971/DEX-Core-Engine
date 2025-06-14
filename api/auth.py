@@ -16,7 +16,7 @@ ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("JWT_EXPIRE_MINUTES", "15"))
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
 
 
 class UserRole(str, Enum):
@@ -48,12 +48,16 @@ class TokenData(BaseModel):
     role: Optional[UserRole] = None
 
 
-async def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)) -> TokenData:
+async def verify_token(
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
+) -> TokenData:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
+    if credentials is None:
+        raise credentials_exception
     try:
         payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
         username: str | None = payload.get("sub")
