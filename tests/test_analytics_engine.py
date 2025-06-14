@@ -79,3 +79,34 @@ async def test_error_on_bad_window(monkeypatch):
     os.environ["FX_API_KEY"] = "k"
     monkeypatch.setattr("httpx.AsyncClient", lambda timeout: DummyClient(1.2))
     await engine.update_price("AAA", 1, "EUR")
+
+
+@pytest.mark.asyncio
+async def test_fetch_rate(monkeypatch):
+    os.environ["FX_API_URL"] = "http://test"
+    os.environ["FX_API_KEY"] = "k"
+    rm = RiskManager()
+    engine = AnalyticsEngine(rm)
+    monkeypatch.setattr(engine, "_circuit", SimpleNamespace(call=lambda f, *a, **k: f(*a, **k)))
+    monkeypatch.setattr("httpx.AsyncClient", lambda timeout: DummyClient(2.0))
+    rate = await engine._fetch_rate("EUR", "USD")
+    assert rate == 2.0
+
+
+@pytest.mark.asyncio
+async def test_fetch_rate_missing(monkeypatch):
+    os.environ.pop("FX_API_URL", None)
+    os.environ.pop("FX_API_KEY", None)
+    rm = RiskManager()
+    engine = AnalyticsEngine(rm)
+    monkeypatch.setattr(engine, "_circuit", SimpleNamespace(call=lambda f, *a, **k: f(*a, **k)))
+    with pytest.raises(AnalyticsError):
+        await engine._fetch_rate("EUR", "USD")
+
+
+@pytest.mark.asyncio
+async def test_convert_price_same_currency():
+    rm = RiskManager()
+    engine = AnalyticsEngine(rm)
+    price = await engine._convert_price(10.0, "USD")
+    assert price == 10.0
