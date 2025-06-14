@@ -84,3 +84,17 @@ class AnalyticsAPIError(BaseAppError):
 
     def __init__(self, message: str) -> None:
         super().__init__("analytics_error", message)
+
+
+class DatabaseBackupError(BaseAppError):
+    """Raised when database backup fails."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__("db_backup_error", message)
+
+
+class DatabaseMaintenanceError(BaseAppError):
+    """Raised when maintenance operations fail."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__("db_maintenance_error", message)
