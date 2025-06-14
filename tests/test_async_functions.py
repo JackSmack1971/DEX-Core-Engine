@@ -148,3 +148,43 @@ async def test_execute_swap_slippage_violation(monkeypatch):
     with pytest.raises(DexError):
         await handler.execute_swap(1, ["a", "b"])
     assert SLIPPAGE_VIOLATIONS._value.get() == start_violations + 1
+
+
+@pytest.mark.asyncio
+async def test_execute_swap_zero_slippage_rejected(monkeypatch):
+    handler = DEXHandler.__new__(DEXHandler)
+    handler.web3_service = MagicMock()
+    handler.contract = MagicMock()
+    handler.web3_service.account = MagicMock(address="0xabc")
+    handler.web3_service.web3 = MagicMock(eth=MagicMock(gas_price=1))
+    handler._circuit = MagicMock(call=lambda f, *a, **kw: f(*a, **kw))
+    handler._do_swap = AsyncMock(return_value="0xdead")
+    handler.contract.functions.getAmountsOut = MagicMock(
+        return_value=MagicMock(call=MagicMock(return_value=[1, 2]))
+    )
+
+    async def fake_thread(func, *a, **kw):
+        return func()
+
+    monkeypatch.setattr(asyncio, "to_thread", fake_thread)
+    monkeypatch.setattr(
+        SlippageProtectionEngine,
+        "calculate_protected_slippage",
+        lambda amt: amt,
+    )
+    called = {"count": 0}
+    orig_validate = SlippageProtectionEngine.validate_transaction_slippage
+
+    def _validate(expected: int, actual: int) -> None:
+        called["count"] += 1
+        orig_validate(expected, actual)
+
+    monkeypatch.setattr(
+        SlippageProtectionEngine,
+        "validate_transaction_slippage",
+        _validate,
+    )
+
+    with pytest.raises(DexError):
+        await handler.execute_swap(1, ["a", "b"])
+    assert called["count"] == 1

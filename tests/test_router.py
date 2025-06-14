@@ -223,3 +223,30 @@ async def test_router_slippage_violation(monkeypatch):
     with pytest.raises(DexError):
         await router.execute_swap(1, "a", "b")
     assert SLIPPAGE_VIOLATIONS._value.get() == start + 1
+
+
+@pytest.mark.asyncio
+async def test_router_zero_slippage_rejected(monkeypatch):
+    p1 = DummyProto([("a", "b", 1)], "p1")
+    router = Router([p1])
+    monkeypatch.setattr(
+        SlippageProtectionEngine,
+        "calculate_protected_slippage",
+        lambda amt: amt,
+    )
+    call = {"count": 0}
+    orig_validate = SlippageProtectionEngine.validate_transaction_slippage
+
+    def _validate(expected: int, actual: int) -> None:
+        call["count"] += 1
+        orig_validate(expected, actual)
+
+    monkeypatch.setattr(
+        SlippageProtectionEngine,
+        "validate_transaction_slippage",
+        _validate,
+    )
+    with pytest.raises(DexError):
+        await router.execute_swap(1, "a", "b")
+    assert call["count"] == 1
+    assert p1.execute_swap.await_count == 0
