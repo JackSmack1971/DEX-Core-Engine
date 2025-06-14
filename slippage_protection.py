@@ -10,6 +10,7 @@ from logger import get_logger
 from observability.metrics import SLIPPAGE_CHECKS, SLIPPAGE_REJECTED
 from utils.circuit_breaker import CircuitBreaker
 from utils.retry import retry_async
+import config
 
 logger = get_logger("slippage_protection")
 
@@ -87,6 +88,27 @@ class SlippageProtectionEngine:
             self.params.tolerance_percent,
         )
 
+    @staticmethod
+    def calculate_protected_slippage(expected_amount: int) -> int:
+        """Return minimum output amount respecting ``MAX_SLIPPAGE_BPS``."""
+        if expected_amount <= 0:
+            raise ValueError("expected_amount must be positive")
+        bps = config.MAX_SLIPPAGE_BPS
+        min_amount = int(expected_amount * (10000 - bps) / 10000)
+        return max(1, min_amount)
+
+    @staticmethod
+    def validate_transaction_slippage(expected_amount: int, actual_amount: int) -> None:
+        """Validate that slippage between ``expected_amount`` and ``actual_amount``
+        does not exceed ``MAX_SLIPPAGE_BPS``."""
+        if expected_amount <= 0 or actual_amount < 0:
+            raise ValueError("invalid amounts")
+        diff_bps = abs(expected_amount - actual_amount) * 10000 / expected_amount
+        if diff_bps > config.MAX_SLIPPAGE_BPS:
+            raise PriceManipulationError(
+                f"Slippage {diff_bps:.2f}bps exceeds max {config.MAX_SLIPPAGE_BPS}"
+            )
+
 
 def calculate_dynamic_slippage(price_impact: float, volatility: float) -> float:
     """Compute slippage adjusted for market volatility."""
@@ -98,5 +120,7 @@ __all__ = [
     "SlippageParams",
     "SlippageProtectionEngine",
     "calculate_dynamic_slippage",
+    "calculate_protected_slippage",
+    "validate_transaction_slippage",
     "analyze_market_conditions",
 ]

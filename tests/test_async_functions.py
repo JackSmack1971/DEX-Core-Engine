@@ -13,6 +13,7 @@ os.environ.setdefault("UNISWAP_V2_ROUTER", "0x0000000000000000000000000000000000
 os.environ.setdefault("SUSHISWAP_ROUTER", "0x0000000000000000000000000000000000000004")
 
 from dex_handler import DEXHandler
+from slippage_protection import SlippageProtectionEngine
 from strategy import ArbitrageStrategy
 
 
@@ -81,6 +82,23 @@ async def test_execute_swap_increments_metrics(monkeypatch):
     handler.web3_service.web3 = MagicMock(eth=MagicMock(gas_price=1))
     handler._circuit = MagicMock(call=lambda f, *a, **kw: f(*a, **kw))
     handler._do_swap = AsyncMock(return_value="0xdead")
+    handler.contract.functions.getAmountsOut = MagicMock(
+        return_value=MagicMock(call=MagicMock(return_value=[1, 2]))
+    )
+    async def fake_thread(func, *a, **kw):
+        return func()
+
+    monkeypatch.setattr(asyncio, "to_thread", fake_thread)
+    monkeypatch.setattr(
+        SlippageProtectionEngine,
+        "calculate_protected_slippage",
+        lambda amt: 1,
+    )
+    monkeypatch.setattr(
+        SlippageProtectionEngine,
+        "validate_transaction_slippage",
+        lambda *a, **kw: None,
+    )
 
     from observability.metrics import TRADE_COUNT, TRADE_SUCCESS
 

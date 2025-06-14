@@ -1,6 +1,7 @@
 import pytest
 
 import slippage_protection
+import config
 
 from exceptions import PriceManipulationError
 from slippage_protection import (
@@ -84,3 +85,13 @@ def test_analyze_market_conditions_classification():
 
 def test_calculate_dynamic_slippage():
     assert calculate_dynamic_slippage(0.1, 0.2) == 0.1 * 1.2
+
+
+def test_calculate_protected_slippage_and_validation(monkeypatch):
+    monkeypatch.setattr(config, "MAX_SLIPPAGE_BPS", 50)
+    expected = 1000
+    min_out = SlippageProtectionEngine.calculate_protected_slippage(expected)
+    assert min_out == 995
+    SlippageProtectionEngine.validate_transaction_slippage(expected, min_out)
+    with pytest.raises(PriceManipulationError):
+        SlippageProtectionEngine.validate_transaction_slippage(expected, 900)
