@@ -31,8 +31,12 @@ class StrategyMetrics:
     successful_trades: int = 0
     total_pnl: float = 0.0
     sharpe_ratio: float = 0.0
+    sortino_ratio: float = 0.0
+    calmar_ratio: float = 0.0
+    profit_factor: float = 0.0
     max_drawdown: float = 0.0
     win_rate: float = 0.0
+    rolling_returns: List[float] = field(default_factory=list)
 
 
 class BaseStrategy(ABC):
@@ -60,7 +64,9 @@ class BaseStrategy(ABC):
         """Analyze market conditions and return signals."""
 
     @abstractmethod
-    async def generate_signals(self, market_data: Dict[str, Any]) -> List[Dict[str, Any]]:
+    async def generate_signals(
+        self, market_data: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
         """Generate trading signals based on market analysis."""
 
     @abstractmethod
@@ -94,5 +100,6 @@ class BaseStrategy(ABC):
     def get_metrics(self) -> StrategyMetrics:
         """Return current strategy performance metrics."""
         return self.metrics
+
 
 __all__ = ["StrategyConfig", "StrategyMetrics", "BaseStrategy"]
