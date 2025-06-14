@@ -19,7 +19,7 @@ class DatabaseService:
         self._config = config
         self.logger = get_logger("database_service")
         engine_kwargs = {"echo": config.echo}
-        if config.url.startswith("postgresql"):
+        if str(config.url).startswith("postgresql"):
             engine_kwargs.update(
                 pool_size=config.pool_size,
                 max_overflow=config.max_overflow,

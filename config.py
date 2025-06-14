@@ -4,10 +4,15 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 from dotenv import load_dotenv
-from pydantic import BaseModel, Field, ValidationError, validator
+from pydantic import BaseModel, Field, PostgresDsn, ValidationError, validator
+from pydantic_settings import (
+    BaseSettings,
+    PydanticBaseSettingsSource,
+    SettingsConfigDict,
+)
 from web3 import Web3
 
 from exceptions import ConfigurationError
@@ -74,10 +79,15 @@ class PortfolioSettings(BaseModel):
     max_assets: int = Field(20, ge=1)
 
 
-class DatabaseSettings(BaseModel):
+class DatabaseSettings(BaseSettings):
     """Database connection parameters."""
 
-    url: str = Field(..., description="PostgreSQL connection URL")
+    model_config = SettingsConfigDict(
+        env_prefix="DATABASE_",
+        env_nested_delimiter="__",
+    )
+
+    url: PostgresDsn = Field(..., description="PostgreSQL connection URL")
     pool_size: int = Field(5, ge=1, le=20)
     max_overflow: int = Field(10, ge=0, le=50)
     pool_timeout: int = Field(30, ge=5, le=120)
@@ -85,8 +95,10 @@ class DatabaseSettings(BaseModel):
     echo: bool = Field(False, description="Enable SQL query logging")
 
 
-class AppConfig(BaseModel):
+class AppConfig(BaseSettings):
     """Validated application configuration."""
+
+    model_config = SettingsConfigDict(env_nested_delimiter="__")
 
     rpc_url: str
     private_key: str
@@ -111,6 +123,27 @@ class AppConfig(BaseModel):
     slippage_protection: SlippageProtectionSettings
     portfolio: PortfolioSettings
     database: DatabaseSettings
+
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls: type[BaseSettings],
+        init_settings: PydanticBaseSettingsSource,
+        env_settings: PydanticBaseSettingsSource,
+        dotenv_settings: PydanticBaseSettingsSource,
+        file_secret_settings: PydanticBaseSettingsSource,
+    ) -> tuple[PydanticBaseSettingsSource, ...]:
+        """Load .env files before reading environment variables."""
+
+        def load_env() -> dict[str, Any]:
+            env = os.getenv("APP_ENV", "dev")
+            for file in (f".env.{env}", ".env"):
+                path = Path(file)
+                if path.is_file():
+                    load_dotenv(path, override=False)
+            return env_settings()
+
+        return init_settings, load_env, dotenv_settings, file_secret_settings
 
     @validator(
         "wallet_address",
@@ -143,88 +176,12 @@ class ConfigManager:
             if path.is_file():
                 load_dotenv(path, override=False)
 
-    def _env(self, key: str) -> str:
-        value = os.getenv(key, "").strip()
-        if not value:
-            raise ConfigurationError(f"{key} environment variable not set")
-        return value
 
-    def _build_dict(self) -> Dict[str, Any]:
-        self._load_env_file()
-        return {
-            "rpc_url": self._env("RPC_URL"),
-            "private_key": self._env("PRIVATE_KEY"),
-            "wallet_address": self._env("WALLET_ADDRESS"),
-            "token0_address": self._env("TOKEN0_ADDRESS"),
-            "token1_address": self._env("TOKEN1_ADDRESS"),
-            "uniswap_v2_router": self._env("UNISWAP_V2_ROUTER"),
-            "sushiswap_router": self._env("SUSHISWAP_ROUTER"),
-            "uniswap_v3_quoter": self._env("UNISWAP_V3_QUOTER"),
-            "uniswap_v3_router": self._env("UNISWAP_V3_ROUTER"),
-            "curve_pool": self._env("CURVE_POOL"),
-            "balancer_vault": self._env("BALANCER_VAULT"),
-            "balancer_pool_id": self._env("BALANCER_POOL_ID"),
-            "profit_threshold": float(os.getenv("PROFIT_THRESHOLD", 1.0)),
-            "poll_interval_seconds": int(os.getenv("POLL_INTERVAL_SECONDS", 10)),
-            "slippage_tolerance_percent": float(
-                os.getenv("SLIPPAGE_TOLERANCE_PERCENT", 0.5)
-            ),
-            "trading": {
-                "max_position_size": float(os.getenv("MAX_POSITION_SIZE", 1.0)),
-                "risk_limit": float(os.getenv("RISK_LIMIT", 0.01)),
-                "max_daily_volume": float(os.getenv("MAX_DAILY_VOLUME", 100.0)),
-            },
-            "risk": {
-                "max_drawdown_percent": float(
-                    os.getenv("MAX_DRAWDOWN_PERCENT", 20.0)
-                ),
-                "stop_loss_percent": float(os.getenv("STOP_LOSS_PERCENT", 5.0)),
-                "take_profit_percent": float(os.getenv("TAKE_PROFIT_PERCENT", 10.0)),
-            },
-            "dex": {
-                "gas_limit": int(os.getenv("GAS_LIMIT", 250_000)),
-                "tx_timeout": int(os.getenv("TX_TIMEOUT", 120)),
-            },
-            "mev": {
-                "enabled": os.getenv("MEV_PROTECTION_ENABLED", "false").lower()
-                == "true",
-                "flashbots_url": os.getenv("FLASHBOTS_URL"),
-                "fork_rpc_url": os.getenv("FORK_RPC_URL"),
-                "deviation_threshold": float(
-                    os.getenv("DEVIATION_THRESHOLD", 0.05)
-                ),
-            },
-            "batch": {
-                "enabled": os.getenv("BATCH_TRANSACTIONS_ENABLED", "false").lower()
-                == "true",
-                "multicall_address": os.getenv("MULTICALL_ADDRESS"),
-            },
-            "slippage_protection": {
-                "dynamic_slippage_enabled": os.getenv(
-                    "DYNAMIC_SLIPPAGE_ENABLED", "false"
-                ).lower()
-                == "true",
-                "max_slippage_bps": int(os.getenv("MAX_SLIPPAGE_BPS", 50)),
-            },
-            "portfolio": {
-                "rebalance_threshold": float(
-                    os.getenv("REBALANCE_THRESHOLD", 0.05)
-                ),
-                "max_assets": int(os.getenv("MAX_PORTFOLIO_ASSETS", 20)),
-            },
-            "database": {
-                "url": self._env("DATABASE_URL"),
-                "pool_size": int(os.getenv("DB_POOL_SIZE", 5)),
-                "max_overflow": int(os.getenv("DB_MAX_OVERFLOW", 10)),
-                "pool_timeout": int(os.getenv("DB_POOL_TIMEOUT", 30)),
-                "pool_recycle": int(os.getenv("DB_POOL_RECYCLE", 3600)),
-                "echo": os.getenv("DB_ECHO", "false").lower() == "true",
-            },
-        }
 
     def _build_config(self) -> AppConfig:
+        self._load_env_file()
         try:
-            return AppConfig(**self._build_dict())
+            return AppConfig()
         except ValidationError as exc:
             raise ConfigurationError(str(exc)) from exc
 
@@ -273,12 +230,12 @@ def _update_globals(cfg: AppConfig) -> None:
         "MAX_SLIPPAGE_BPS": cfg.slippage_protection.max_slippage_bps,
         "REBALANCE_THRESHOLD": cfg.portfolio.rebalance_threshold,
         "MAX_PORTFOLIO_ASSETS": cfg.portfolio.max_assets,
-        "DATABASE_URL": cfg.database.url,
-        "DB_POOL_SIZE": cfg.database.pool_size,
-        "DB_MAX_OVERFLOW": cfg.database.max_overflow,
-        "DB_POOL_TIMEOUT": cfg.database.pool_timeout,
-        "DB_POOL_RECYCLE": cfg.database.pool_recycle,
-        "DB_ECHO": cfg.database.echo,
+        "DATABASE__URL": cfg.database.url,
+        "DATABASE__POOL_SIZE": cfg.database.pool_size,
+        "DATABASE__MAX_OVERFLOW": cfg.database.max_overflow,
+        "DATABASE__POOL_TIMEOUT": cfg.database.pool_timeout,
+        "DATABASE__POOL_RECYCLE": cfg.database.pool_recycle,
+        "DATABASE__ECHO": cfg.database.echo,
     }
     globals().update(mapping)
 
@@ -319,12 +276,12 @@ DYNAMIC_SLIPPAGE_ENABLED = cfg.slippage_protection.dynamic_slippage_enabled
 MAX_SLIPPAGE_BPS = cfg.slippage_protection.max_slippage_bps
 REBALANCE_THRESHOLD = cfg.portfolio.rebalance_threshold
 MAX_PORTFOLIO_ASSETS = cfg.portfolio.max_assets
-DATABASE_URL = cfg.database.url
-DB_POOL_SIZE = cfg.database.pool_size
-DB_MAX_OVERFLOW = cfg.database.max_overflow
-DB_POOL_TIMEOUT = cfg.database.pool_timeout
-DB_POOL_RECYCLE = cfg.database.pool_recycle
-DB_ECHO = cfg.database.echo
+DATABASE__URL = cfg.database.url
+DATABASE__POOL_SIZE = cfg.database.pool_size
+DATABASE__MAX_OVERFLOW = cfg.database.max_overflow
+DATABASE__POOL_TIMEOUT = cfg.database.pool_timeout
+DATABASE__POOL_RECYCLE = cfg.database.pool_recycle
+DATABASE__ECHO = cfg.database.echo
 
 __all__ = [
     "CONFIG_MANAGER",
@@ -361,10 +318,10 @@ __all__ = [
     "MAX_SLIPPAGE_BPS",
     "REBALANCE_THRESHOLD",
     "MAX_PORTFOLIO_ASSETS",
-    "DATABASE_URL",
-    "DB_POOL_SIZE",
-    "DB_MAX_OVERFLOW",
-    "DB_POOL_TIMEOUT",
-    "DB_POOL_RECYCLE",
-    "DB_ECHO",
+    "DATABASE__URL",
+    "DATABASE__POOL_SIZE",
+    "DATABASE__MAX_OVERFLOW",
+    "DATABASE__POOL_TIMEOUT",
+    "DATABASE__POOL_RECYCLE",
+    "DATABASE__ECHO",
 ]
