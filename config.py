@@ -74,6 +74,17 @@ class PortfolioSettings(BaseModel):
     max_assets: int = Field(20, ge=1)
 
 
+class DatabaseSettings(BaseModel):
+    """Database connection parameters."""
+
+    url: str = Field(..., description="PostgreSQL connection URL")
+    pool_size: int = Field(5, ge=1, le=20)
+    max_overflow: int = Field(10, ge=0, le=50)
+    pool_timeout: int = Field(30, ge=5, le=120)
+    pool_recycle: int = Field(3600, ge=300)
+    echo: bool = Field(False, description="Enable SQL query logging")
+
+
 class AppConfig(BaseModel):
     """Validated application configuration."""
 
@@ -99,6 +110,7 @@ class AppConfig(BaseModel):
     batch: BatchSettings
     slippage_protection: SlippageProtectionSettings
     portfolio: PortfolioSettings
+    database: DatabaseSettings
 
     @validator(
         "wallet_address",
@@ -200,6 +212,14 @@ class ConfigManager:
                 ),
                 "max_assets": int(os.getenv("MAX_PORTFOLIO_ASSETS", 20)),
             },
+            "database": {
+                "url": self._env("DATABASE_URL"),
+                "pool_size": int(os.getenv("DB_POOL_SIZE", 5)),
+                "max_overflow": int(os.getenv("DB_MAX_OVERFLOW", 10)),
+                "pool_timeout": int(os.getenv("DB_POOL_TIMEOUT", 30)),
+                "pool_recycle": int(os.getenv("DB_POOL_RECYCLE", 3600)),
+                "echo": os.getenv("DB_ECHO", "false").lower() == "true",
+            },
         }
 
     def _build_config(self) -> AppConfig:
@@ -253,6 +273,12 @@ def _update_globals(cfg: AppConfig) -> None:
         "MAX_SLIPPAGE_BPS": cfg.slippage_protection.max_slippage_bps,
         "REBALANCE_THRESHOLD": cfg.portfolio.rebalance_threshold,
         "MAX_PORTFOLIO_ASSETS": cfg.portfolio.max_assets,
+        "DATABASE_URL": cfg.database.url,
+        "DB_POOL_SIZE": cfg.database.pool_size,
+        "DB_MAX_OVERFLOW": cfg.database.max_overflow,
+        "DB_POOL_TIMEOUT": cfg.database.pool_timeout,
+        "DB_POOL_RECYCLE": cfg.database.pool_recycle,
+        "DB_ECHO": cfg.database.echo,
     }
     globals().update(mapping)
 
@@ -293,6 +319,12 @@ DYNAMIC_SLIPPAGE_ENABLED = cfg.slippage_protection.dynamic_slippage_enabled
 MAX_SLIPPAGE_BPS = cfg.slippage_protection.max_slippage_bps
 REBALANCE_THRESHOLD = cfg.portfolio.rebalance_threshold
 MAX_PORTFOLIO_ASSETS = cfg.portfolio.max_assets
+DATABASE_URL = cfg.database.url
+DB_POOL_SIZE = cfg.database.pool_size
+DB_MAX_OVERFLOW = cfg.database.max_overflow
+DB_POOL_TIMEOUT = cfg.database.pool_timeout
+DB_POOL_RECYCLE = cfg.database.pool_recycle
+DB_ECHO = cfg.database.echo
 
 __all__ = [
     "CONFIG_MANAGER",
@@ -329,4 +361,10 @@ __all__ = [
     "MAX_SLIPPAGE_BPS",
     "REBALANCE_THRESHOLD",
     "MAX_PORTFOLIO_ASSETS",
+    "DATABASE_URL",
+    "DB_POOL_SIZE",
+    "DB_MAX_OVERFLOW",
+    "DB_POOL_TIMEOUT",
+    "DB_POOL_RECYCLE",
+    "DB_ECHO",
 ]

@@ -11,4 +11,7 @@ python-json-logger
 prometheus-client
 hypothesis
 pulp
+SQLAlchemy>=2.0
+asyncpg
+aiosqlite
 
