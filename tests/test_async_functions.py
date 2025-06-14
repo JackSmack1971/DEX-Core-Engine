@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 os.environ.setdefault("RPC_URL", "http://localhost")
-os.environ.setdefault("PRIVATE_KEY", "test")
+os.environ.setdefault("ENCRYPTED_PRIVATE_KEY", "encrypted")
 os.environ.setdefault("WALLET_ADDRESS", "0x0000000000000000000000000000000000000005")
 os.environ.setdefault("TOKEN0_ADDRESS", "0x0000000000000000000000000000000000000001")
 os.environ.setdefault("TOKEN1_ADDRESS", "0x0000000000000000000000000000000000000002")
