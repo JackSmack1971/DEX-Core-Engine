@@ -8,6 +8,7 @@ from web3.contract import Contract
 
 from dex_protocols.base import BaseDEXProtocol, LiquidityInfo
 from exceptions import DexError
+from observability.metrics import SLIPPAGE_APPLIED, SLIPPAGE_VIOLATIONS
 from tokens.detect import (
     ERC20_ABI,
     TokenInspectionError,
@@ -135,7 +136,16 @@ class UniswapV3(BaseDEXProtocol):
             balance_after = await get_token_balance(
                 contract, self.web3_service.account.address
             )
-            if balance_after <= balance_before:
+            actual_out = balance_after - balance_before
+            if actual_out < amount_out_min:
+                SLIPPAGE_VIOLATIONS.inc()
+            slip_pct = (
+                (amount_out_min - actual_out) * 100 / amount_out_min
+                if actual_out < amount_out_min and amount_out_min
+                else 0.0
+            )
+            SLIPPAGE_APPLIED.observe(max(slip_pct, 0.0))
+            if actual_out <= 0:
                 raise DexError("token balance check failed")
             return receipt["transactionHash"].hex()
         except Exception as exc:  # noqa: BLE001

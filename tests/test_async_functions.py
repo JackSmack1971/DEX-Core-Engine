@@ -14,7 +14,14 @@ os.environ.setdefault("SUSHISWAP_ROUTER", "0x00000000000000000000000000000000000
 
 from dex_handler import DEXHandler
 from slippage_protection import SlippageProtectionEngine
+from exceptions import DexError, PriceManipulationError
 from strategy import ArbitrageStrategy
+from observability.metrics import (
+    TRADE_COUNT,
+    TRADE_SUCCESS,
+    SLIPPAGE_APPLIED,
+    SLIPPAGE_VIOLATIONS,
+)
 
 
 @pytest.mark.asyncio
@@ -99,12 +106,45 @@ async def test_execute_swap_increments_metrics(monkeypatch):
         "validate_transaction_slippage",
         lambda *a, **kw: None,
     )
-
-    from observability.metrics import TRADE_COUNT, TRADE_SUCCESS
-
     start_count = TRADE_COUNT._value.get()
     start_success = TRADE_SUCCESS._value.get()
+    start_sum = SLIPPAGE_APPLIED._sum.get()
     tx_hash = await handler.execute_swap(1, ["a", "b"])
     assert tx_hash == "0xdead"
     assert TRADE_COUNT._value.get() == start_count + 1
     assert TRADE_SUCCESS._value.get() == start_success + 1
+    assert SLIPPAGE_APPLIED._sum.get() > start_sum
+
+
+@pytest.mark.asyncio
+async def test_execute_swap_slippage_violation(monkeypatch):
+    handler = DEXHandler.__new__(DEXHandler)
+    handler.web3_service = MagicMock()
+    handler.contract = MagicMock()
+    handler.web3_service.account = MagicMock(address="0xabc")
+    handler.web3_service.web3 = MagicMock(eth=MagicMock(gas_price=1))
+    handler._circuit = MagicMock(call=lambda f, *a, **kw: f(*a, **kw))
+    handler._do_swap = AsyncMock(return_value="0xdead")
+    handler.contract.functions.getAmountsOut = MagicMock(
+        return_value=MagicMock(call=MagicMock(return_value=[1, 2]))
+    )
+
+    async def fake_thread(func, *a, **kw):
+        return func()
+
+    monkeypatch.setattr(asyncio, "to_thread", fake_thread)
+    monkeypatch.setattr(
+        SlippageProtectionEngine,
+        "calculate_protected_slippage",
+        lambda amt: 1,
+    )
+    monkeypatch.setattr(
+        SlippageProtectionEngine,
+        "validate_transaction_slippage",
+        lambda *a, **kw: (_ for _ in ()).throw(PriceManipulationError("bad")),
+    )
+
+    start_violations = SLIPPAGE_VIOLATIONS._value.get()
+    with pytest.raises(DexError):
+        await handler.execute_swap(1, ["a", "b"])
+    assert SLIPPAGE_VIOLATIONS._value.get() == start_violations + 1

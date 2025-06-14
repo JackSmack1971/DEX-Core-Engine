@@ -8,7 +8,7 @@ from typing import Dict, Iterable, List, Tuple
 import os
 
 from dex_protocols.base import BaseDEXProtocol
-from exceptions import DexError
+from exceptions import DexError, PriceManipulationError
 import config
 from slippage_protection import (
     SlippageParams,
@@ -17,6 +17,7 @@ from slippage_protection import (
     MIN_TOLERANCE_PERCENT,
 )
 from logger import get_logger
+from observability.metrics import SLIPPAGE_APPLIED, SLIPPAGE_VIOLATIONS
 
 
 @dataclass
@@ -207,9 +208,19 @@ class Router:
                 amount_out_min = SlippageProtectionEngine.calculate_protected_slippage(
                     int(expected_out)
                 )
-                SlippageProtectionEngine.validate_transaction_slippage(
-                    int(expected_out), amount_out_min
+                slip_pct = (
+                    (int(expected_out) - amount_out_min) * 100 / int(expected_out)
+                    if expected_out
+                    else 0.0
                 )
+                SLIPPAGE_APPLIED.observe(slip_pct)
+                try:
+                    SlippageProtectionEngine.validate_transaction_slippage(
+                        int(expected_out), amount_out_min
+                    )
+                except PriceManipulationError as exc:
+                    SLIPPAGE_VIOLATIONS.inc()
+                    raise DexError(str(exc)) from exc
                 tx = await proto.execute_swap(part, hop, amount_out_min)
                 total_out += expected_out
                 remaining -= part

@@ -10,6 +10,14 @@ SLIPPAGE_CHECKS = Counter('slippage_checks_total', 'Number of slippage checks')
 SLIPPAGE_REJECTED = Counter(
     'slippage_rejected_total', 'Trades rejected due to slippage'
 )
+SLIPPAGE_APPLIED = Histogram(
+    'slippage_applied_percent',
+    'Slippage percentage applied to trades',
+)
+SLIPPAGE_VIOLATIONS = Counter(
+    'slippage_violations_total',
+    'Number of swaps exceeding slippage limits',
+)
 OPTIMIZATION_RUNS = Counter(
     'optimization_runs_total',
     'Number of profit optimization executions',
@@ -45,6 +53,8 @@ __all__ = [
     'API_LATENCY',
     'SLIPPAGE_CHECKS',
     'SLIPPAGE_REJECTED',
+    'SLIPPAGE_APPLIED',
+    'SLIPPAGE_VIOLATIONS',
     'OPTIMIZATION_RUNS',
     'OPTIMIZATION_FAILURES',
     'RISK_ADJUSTED_PROFIT',

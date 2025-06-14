@@ -2,7 +2,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from exceptions import DexError, ServiceUnavailableError
+from exceptions import DexError, ServiceUnavailableError, PriceManipulationError
 from dex_protocols.base import LiquidityInfo
 from slippage_protection import (
     MarketConditions,
@@ -12,6 +12,7 @@ from slippage_protection import (
 )
 import routing
 from routing import Router
+from observability.metrics import SLIPPAGE_APPLIED, SLIPPAGE_VIOLATIONS
 
 
 class DummyProto:
@@ -183,3 +184,42 @@ async def test_reject_on_low_slippage(monkeypatch):
     p1.liq = LiquidityInfo(liquidity=100.0, price_impact=0.0)
     with pytest.raises(DexError):
         await router.execute_swap(1, "a", "b")
+
+
+@pytest.mark.asyncio
+async def test_router_slippage_metrics(monkeypatch):
+    p1 = DummyProto([("a", "b", 1)], "p1")
+    router = Router([p1])
+    monkeypatch.setattr(
+        SlippageProtectionEngine,
+        "calculate_protected_slippage",
+        lambda amt: max(1, int(amt) - 1),
+    )
+    monkeypatch.setattr(
+        SlippageProtectionEngine,
+        "validate_transaction_slippage",
+        lambda *_a, **_kw: None,
+    )
+    start_sum = SLIPPAGE_APPLIED._sum.get()
+    await router.execute_swap(1, "a", "b")
+    assert SLIPPAGE_APPLIED._sum.get() > start_sum
+
+
+@pytest.mark.asyncio
+async def test_router_slippage_violation(monkeypatch):
+    p1 = DummyProto([("a", "b", 1)], "p1")
+    router = Router([p1])
+    monkeypatch.setattr(
+        SlippageProtectionEngine,
+        "calculate_protected_slippage",
+        lambda amt: max(1, int(amt) - 1),
+    )
+    monkeypatch.setattr(
+        SlippageProtectionEngine,
+        "validate_transaction_slippage",
+        lambda *_a, **_kw: (_ for _ in ()).throw(PriceManipulationError("bad")),
+    )
+    start = SLIPPAGE_VIOLATIONS._value.get()
+    with pytest.raises(DexError):
+        await router.execute_swap(1, "a", "b")
+    assert SLIPPAGE_VIOLATIONS._value.get() == start + 1
