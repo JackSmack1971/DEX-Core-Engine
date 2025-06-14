@@ -1,11 +1,11 @@
-from __future__ import annotations
-
 """Profit optimization utilities.
 
 This module provides several linear programming optimizers that use
 `pulp` to determine optimal capital allocations under different models.
 Each optimizer records metrics on successful and failed optimization runs.
 """
+
+from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import List

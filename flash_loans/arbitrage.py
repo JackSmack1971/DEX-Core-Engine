@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Flash loan based arbitrage executor."""
+
+from __future__ import annotations
 
 import asyncio
 from typing import Awaitable, Callable
