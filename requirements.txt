@@ -19,3 +19,7 @@ aiosqlite
 redis[hiredis]>=5.0.0
 cryptography
 
+fastapi-users[sqlalchemy]>=12.1.0
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+python-multipart>=0.0.6

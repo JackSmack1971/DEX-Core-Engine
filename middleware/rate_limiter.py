@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import time
 from collections import defaultdict, deque
 from typing import Deque
@@ -16,9 +17,10 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
 
     instance: "RateLimiterMiddleware | None" = None
 
-    def __init__(self, app: FastAPI, limit: int = 100) -> None:
+    def __init__(self, app: FastAPI, limit: int | None = None) -> None:
         super().__init__(app)
-        self.limit = limit
+        env_limit = int(os.getenv("API_RATE_LIMIT", "100"))
+        self.limit = limit or env_limit
         self.window = 60
         self._hits: defaultdict[str, Deque[float]] = defaultdict(deque)
         RateLimiterMiddleware.instance = self

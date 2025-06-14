@@ -2,8 +2,10 @@ import asyncio
 import time
 from fastapi.testclient import TestClient
 import pytest
+from jose import jwt
 
-from api import app, metrics
+from api import app
+from api.auth import ALGORITHM, SECRET_KEY, UserRole
 from middleware.rate_limiter import RateLimiterMiddleware
 from utils.circuit_breaker import CircuitBreaker
 from utils.retry import retry_async
@@ -54,7 +56,13 @@ def test_rate_limit_and_health_endpoints():
     assert r.status_code == 429
 
 
+def _token(role: UserRole = UserRole.ADMIN) -> str:
+    return jwt.encode({"sub": "tester", "role": role.value}, SECRET_KEY, algorithm=ALGORITHM)
+
+
 def test_metrics_endpoint():
-    response = asyncio.run(metrics())
+    client = TestClient(app)
+    headers = {"Authorization": f"Bearer {_token()}"}
+    response = client.get("/metrics", headers=headers)
     assert response.status_code == 200
-    assert b"trade_count_total" in response.body
+    assert b"trade_count_total" in response.content
