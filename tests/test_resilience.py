@@ -4,6 +4,7 @@ from fastapi.testclient import TestClient
 import pytest
 
 from api import app, metrics
+from middleware.rate_limiter import RateLimiterMiddleware
 from utils.circuit_breaker import CircuitBreaker
 from utils.retry import retry_async
 from exceptions import ServiceUnavailableError
@@ -40,7 +41,11 @@ def test_circuit_breaker_trips():
 
 def test_rate_limit_and_health_endpoints():
     client = TestClient(app)
-    for _ in range(100):
+    client.get("/health")  # trigger middleware initialization
+    rl = RateLimiterMiddleware.get_instance()
+    rl.reset()
+    limit = rl.limit
+    for _ in range(limit):
         r = client.get("/health")
         assert r.status_code == 200
     r = client.get("/health")
