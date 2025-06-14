@@ -4,7 +4,7 @@ pytest
 pytest-asyncio
 pytest-cov
 pydantic
-pydantic-settings
+pydantic-settings>=2.1.0
 fastapi
 uvicorn
 httpx
@@ -12,7 +12,9 @@ python-json-logger
 prometheus-client
 hypothesis
 pulp
-SQLAlchemy>=2.0
-asyncpg
+sqlalchemy[asyncio]>=2.0.0
+asyncpg>=0.29.0
+alembic>=1.13.0
 aiosqlite
+redis[hiredis]>=5.0.0
 
