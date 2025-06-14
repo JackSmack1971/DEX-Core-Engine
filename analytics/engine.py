@@ -1,3 +1,4 @@
+"""Core analytics engine for computing real-time P&L and risk metrics for trading strategies."""
 from __future__ import annotations
 
 import os

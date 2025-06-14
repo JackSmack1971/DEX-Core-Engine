@@ -1,3 +1,4 @@
+"""Functions for generating aggregated reports and exporting results."""
 from __future__ import annotations
 
 import asyncio
