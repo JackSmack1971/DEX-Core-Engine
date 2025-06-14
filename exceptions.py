@@ -63,6 +63,13 @@ class ServiceUnavailableError(BaseAppError):
         super().__init__("service_unavailable", message)
 
 
+class DatabaseError(BaseAppError):
+    """Raised for database related failures."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__("database_error", message)
+
+
 
 
 class PriceManipulationError(BaseAppError):
