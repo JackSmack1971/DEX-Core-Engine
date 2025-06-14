@@ -6,7 +6,7 @@ import time
 from collections import defaultdict, deque
 from typing import Deque
 
-from fastapi import Request, Response, responses
+from fastapi import FastAPI, Request, Response, responses
 from starlette.middleware.base import BaseHTTPMiddleware
 
 
@@ -14,11 +14,14 @@ from starlette.middleware.base import BaseHTTPMiddleware
 class RateLimiterMiddleware(BaseHTTPMiddleware):
     """Allow only N requests per minute per client IP."""
 
-    def __init__(self, app, limit: int = 100) -> None:
+    instance: "RateLimiterMiddleware | None" = None
+
+    def __init__(self, app: FastAPI, limit: int = 100) -> None:
         super().__init__(app)
         self.limit = limit
         self.window = 60
         self._hits: defaultdict[str, Deque[float]] = defaultdict(deque)
+        RateLimiterMiddleware.instance = self
 
     async def dispatch(self, request: Request, call_next) -> Response:
         ip = request.client.host
@@ -33,3 +36,13 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
             )
         q.append(now)
         return await call_next(request)
+
+    @classmethod
+    def get_instance(cls) -> "RateLimiterMiddleware":
+        if cls.instance is None:
+            raise RuntimeError("RateLimiterMiddleware not initialized")
+        return cls.instance
+
+    def reset(self) -> None:
+        """Reset all tracked client request counters."""
+        self._hits.clear()
