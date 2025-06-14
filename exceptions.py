@@ -70,3 +70,10 @@ class PriceManipulationError(BaseAppError):
 
     def __init__(self, message: str) -> None:
         super().__init__("price_manipulation", message)
+
+
+class AnalyticsAPIError(BaseAppError):
+    """Raised when analytics API requests fail."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__("analytics_error", message)
