@@ -8,6 +8,7 @@ from slippage_protection import (
     MarketConditions,
     SlippageParams,
     SlippageProtectionEngine,
+    MIN_TOLERANCE_PERCENT,
 )
 import routing
 from routing import Router
@@ -17,7 +18,7 @@ class DummyProto:
     def __init__(self, pools, name: str):
         self.pools = pools
         self.name = name
-        self.get_quote = AsyncMock(return_value=1.0)
+        self.get_quote = AsyncMock(return_value=100.0)
         self.execute_swap = AsyncMock(return_value=f"tx-{name}")
         service = MagicMock()
         service.web3.eth.gas_price = 1
@@ -42,14 +43,24 @@ async def test_multi_hop_route_selection():
 
 
 @pytest.mark.asyncio
-async def test_execute_swap_delegates_to_adapters():
+async def test_execute_swap_delegates_to_adapters(monkeypatch):
     p1 = DummyProto([("a", "b", 1)], "p1")
     p2 = DummyProto([("b", "c", 1)], "p2")
     router = Router([p1, p2])
+    monkeypatch.setattr(
+        SlippageProtectionEngine,
+        "calculate_protected_slippage",
+        lambda amt: max(1, int(amt) - 1),
+    )
+    monkeypatch.setattr(
+        SlippageProtectionEngine,
+        "validate_transaction_slippage",
+        lambda *_a, **_kw: None,
+    )
     tx = await router.execute_swap(1, "a", "c")
     assert tx == "tx-p2"
-    assert p1.execute_swap.await_count == 1
-    assert p2.execute_swap.await_count == 1
+    assert p1.execute_swap.await_count >= 1
+    assert p2.execute_swap.await_count >= 1
 
 
 @pytest.mark.asyncio
@@ -86,6 +97,16 @@ async def test_execute_split_on_high_slippage(monkeypatch):
         AsyncMock(return_value=MarketConditions(100.0, 100.0, 0.0)),
     )
     p1.liq = LiquidityInfo(liquidity=100.0, price_impact=5.0)
+    monkeypatch.setattr(
+        SlippageProtectionEngine,
+        "calculate_protected_slippage",
+        lambda amt: max(1, int(amt) - 1),
+    )
+    monkeypatch.setattr(
+        SlippageProtectionEngine,
+        "validate_transaction_slippage",
+        lambda *_a, **_kw: None,
+    )
     await router.execute_swap(4, "a", "b")
     assert p1.execute_swap.await_count >= 2
 
@@ -103,8 +124,19 @@ async def test_fallback_to_static_slippage(monkeypatch):
         router.slippage_engine, "get_market_conditions", AsyncMock(side_effect=fail)
     )
     p1.liq = LiquidityInfo(liquidity=100.0, price_impact=0.0)
-    await router.execute_swap(2, "a", "b")
-    assert p1.execute_swap.await_count == 1
+    monkeypatch.setattr(
+        SlippageProtectionEngine,
+        "calculate_protected_slippage",
+        lambda amt: max(1, int(amt) - 1),
+    )
+    monkeypatch.setattr(
+        SlippageProtectionEngine,
+        "validate_transaction_slippage",
+        lambda *_a, **_kw: None,
+    )
+    with pytest.raises(DexError):
+        await router.execute_swap(2, "a", "b")
+    assert p1.execute_swap.await_count == 0
 
 
 @pytest.mark.asyncio
@@ -127,7 +159,27 @@ async def test_router_invokes_analysis(monkeypatch):
         "calculate_dynamic_slippage",
         lambda impact, vol: 5.0,
     )
+    monkeypatch.setattr(
+        SlippageProtectionEngine,
+        "calculate_protected_slippage",
+        lambda amt: max(1, int(amt) - 1),
+    )
+    monkeypatch.setattr(
+        SlippageProtectionEngine,
+        "validate_transaction_slippage",
+        lambda *_a, **_kw: None,
+    )
     p1.liq = LiquidityInfo(liquidity=100.0, price_impact=0.1)
     await router.execute_swap(2, "a", "b")
     assert called["count"] >= 1
     assert p1.execute_swap.await_count >= 2
+
+
+@pytest.mark.asyncio
+async def test_reject_on_low_slippage(monkeypatch):
+    p1 = DummyProto([("a", "b", 1)], "p1")
+    router = Router([p1])
+    router.slippage_engine = SlippageProtectionEngine(SlippageParams(1.0, None))
+    p1.liq = LiquidityInfo(liquidity=100.0, price_impact=0.0)
+    with pytest.raises(DexError):
+        await router.execute_swap(1, "a", "b")

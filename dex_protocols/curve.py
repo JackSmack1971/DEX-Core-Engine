@@ -80,7 +80,9 @@ class Curve(BaseDEXProtocol):
             self.logger.error("Curve quote error: %s", exc)
             raise DexError("quote failed") from exc
 
-    async def _execute_swap(self, amount_in: int, route: List[str]) -> str:
+    async def _execute_swap(
+        self, amount_in: int, route: List[str], amount_out_min: int
+    ) -> str:
         try:
             token_out = route[-1]
             contract = self.web3_service.get_contract(token_out, ERC20_ABI)
@@ -94,7 +96,7 @@ class Curve(BaseDEXProtocol):
             )
 
             i, j = self._idx(route[0]), self._idx(token_out)
-            tx = self.pool.functions.exchange(i, j, amount_in, 0).build_transaction(
+            tx = self.pool.functions.exchange(i, j, amount_in, amount_out_min).build_transaction(
                 {
                     "from": self.web3_service.account.address,
                     "gas": int(self.gas_limit * multiplier),

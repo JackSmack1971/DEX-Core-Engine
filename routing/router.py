@@ -14,6 +14,7 @@ from slippage_protection import (
     SlippageParams,
     SlippageProtectionEngine,
     calculate_dynamic_slippage,
+    MIN_TOLERANCE_PERCENT,
 )
 from logger import get_logger
 
@@ -183,6 +184,7 @@ class Router:
             total_out = 0
             while remaining > 0:
                 part = remaining
+                slip = 0.0
                 for _ in range(4):
                     slip = await self._dynamic_slippage(proto, hop, part)
                     tolerance = (
@@ -193,15 +195,23 @@ class Router:
                     if slip <= tolerance or part <= 1:
                         break
                     part //= 2
+                if slip < MIN_TOLERANCE_PERCENT:
+                    raise DexError("slippage below minimum")
                 hop_str = " -> ".join(hop)
                 logger.info(
                     "Executing hop via %s: %s",
                     proto.__class__.__name__,
                     hop_str,
                 )
-                tx = await proto.execute_swap(part, hop)
-                out_amt = await proto.get_quote(hop[0], hop[1], part)
-                total_out += out_amt
+                expected_out = await proto.get_quote(hop[0], hop[1], part)
+                amount_out_min = SlippageProtectionEngine.calculate_protected_slippage(
+                    int(expected_out)
+                )
+                SlippageProtectionEngine.validate_transaction_slippage(
+                    int(expected_out), amount_out_min
+                )
+                tx = await proto.execute_swap(part, hop, amount_out_min)
+                total_out += expected_out
                 remaining -= part
             amt = int(total_out)
         return tx

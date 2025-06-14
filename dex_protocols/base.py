@@ -43,13 +43,15 @@ class BaseDEXProtocol(ABC):
             self.logger.warning("Quote failed: %s", exc)
             return 0.0
 
-    async def execute_swap(self, amount_in: int, route: List[str]) -> str:
+    async def execute_swap(
+        self, amount_in: int, route: List[str], amount_out_min: int = 0
+    ) -> str:
         """Execute a swap along ``route`` and return the transaction hash."""
         if amount_in <= 0 or not route or any(not r for r in route):
             raise DexError("invalid swap parameters")
         try:
             return await self._circuit.call(
-                retry_async, self._execute_swap, amount_in, route
+                retry_async, self._execute_swap, amount_in, route, amount_out_min
             )
         except ServiceUnavailableError as exc:
             self.logger.error("Swap circuit open: %s", exc)
@@ -91,7 +93,9 @@ class BaseDEXProtocol(ABC):
         """Query the protocol for a price quote."""
 
     @abstractmethod
-    async def _execute_swap(self, amount_in: int, route: List[str]) -> str:
+    async def _execute_swap(
+        self, amount_in: int, route: List[str], amount_out_min: int
+    ) -> str:
         """Perform the swap on-chain."""
 
     @abstractmethod

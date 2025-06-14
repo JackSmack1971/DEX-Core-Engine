@@ -99,7 +99,9 @@ class UniswapV3(BaseDEXProtocol):
             self.logger.error("UniswapV3 quote error: %s", exc)
             raise DexError("quote failed") from exc
 
-    async def _execute_swap(self, amount_in: int, route: List[str]) -> str:
+    async def _execute_swap(
+        self, amount_in: int, route: List[str], amount_out_min: int
+    ) -> str:
         token_in, token_out = route[0], route[-1]
         try:
             contract = self.web3_service.get_contract(token_out, ERC20_ABI)
@@ -119,7 +121,7 @@ class UniswapV3(BaseDEXProtocol):
                 "recipient": self.web3_service.account.address,
                 "deadline": int(time.time()) + 300,
                 "amountIn": amount_in,
-                "amountOutMinimum": 0,
+                "amountOutMinimum": amount_out_min,
                 "sqrtPriceLimitX96": 0,
             }
             tx = self.router.functions.exactInputSingle(params).build_transaction(
