@@ -87,7 +87,9 @@ class Balancer(BaseDEXProtocol):
             self.logger.error("Balancer quote error: %s", exc)
             raise DexError("quote failed") from exc
 
-    async def _execute_swap(self, amount_in: int, route: List[str]) -> str:
+    async def _execute_swap(
+        self, amount_in: int, route: List[str], amount_out_min: int
+    ) -> str:
         token_in, token_out = route[0], route[-1]
         single_swap = {
             "poolId": self.pool_id,
@@ -115,7 +117,7 @@ class Balancer(BaseDEXProtocol):
             )
 
             tx = self.vault.functions.swap(
-                single_swap, funds, 0, int(time.time()) + 300
+                single_swap, funds, amount_out_min, int(time.time()) + 300
             ).build_transaction(
                 {
                     "from": self.web3_service.account.address,

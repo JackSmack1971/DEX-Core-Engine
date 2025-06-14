@@ -11,7 +11,9 @@ class DummyDEX(BaseDEXProtocol):
     async def _get_quote(self, token_in: str, token_out: str, amount_in: int) -> float:
         return 1.23
 
-    async def _execute_swap(self, amount_in: int, route: list[str]) -> str:
+    async def _execute_swap(
+        self, amount_in: int, route: list[str], amount_out_min: int
+    ) -> str:
         return "0xdead"
 
     async def _get_best_route(
