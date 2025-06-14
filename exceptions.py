@@ -63,6 +63,13 @@ class ServiceUnavailableError(BaseAppError):
         super().__init__("service_unavailable", message)
 
 
+class AnalyticsRequestError(BaseAppError):
+    """Raised for invalid analytics API requests."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__("analytics_error", message)
+
+
 
 
 class PriceManipulationError(BaseAppError):
