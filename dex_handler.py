@@ -20,7 +20,7 @@ from web3_service import (
     TransactionFailedError,
     TransactionTimeoutError,
 )
-from exceptions import DexError, ServiceUnavailableError
+from exceptions import DexError, PriceManipulationError, ServiceUnavailableError
 from utils.circuit_breaker import CircuitBreaker
 from utils.retry import retry_async
 from tokens.detect import (
@@ -34,7 +34,12 @@ from tokens.detect import (
 from slippage_protection import SlippageProtectionEngine
 from logger import get_logger
 from observability.decorators import log_and_measure
-from observability.metrics import TRADE_COUNT, TRADE_SUCCESS
+from observability.metrics import (
+    TRADE_COUNT,
+    TRADE_SUCCESS,
+    SLIPPAGE_APPLIED,
+    SLIPPAGE_VIOLATIONS,
+)
 
 logger = get_logger("dex_handler")
 
@@ -164,9 +169,19 @@ class DEXHandler:
             amount_out_min = SlippageProtectionEngine.calculate_protected_slippage(
                 expected_out
             )
-            SlippageProtectionEngine.validate_transaction_slippage(
-                expected_out, amount_out_min
+            slippage_pct = (
+                (expected_out - amount_out_min) * 100 / expected_out
+                if expected_out
+                else 0.0
             )
+            SLIPPAGE_APPLIED.observe(slippage_pct)
+            try:
+                SlippageProtectionEngine.validate_transaction_slippage(
+                    expected_out, amount_out_min
+                )
+            except PriceManipulationError as exc:
+                SLIPPAGE_VIOLATIONS.inc()
+                raise DexError(str(exc)) from exc
             tx_hash = await self._circuit.call(
                 retry_async,
                 self._do_swap,
