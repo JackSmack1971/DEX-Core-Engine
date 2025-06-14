@@ -14,6 +14,12 @@ import config
 
 logger = get_logger("slippage_protection")
 
+# Minimum allowed slippage tolerance in percent
+MIN_TOLERANCE_PERCENT = 0.1
+
+# Message for disallowed zero-slippage transactions
+ZERO_SLIPPAGE_MSG = "Zero slippage transactions are not allowed"
+
 
 @dataclass
 class MarketConditions:
@@ -36,6 +42,13 @@ class SlippageProtectionEngine:
     """Check slippage tolerance using external market data."""
 
     def __init__(self, params: SlippageParams) -> None:
+        if params.tolerance_percent < MIN_TOLERANCE_PERCENT:
+            logger.info(
+                "Tolerance %.2f%% below minimum %.2f%%, overriding",
+                params.tolerance_percent,
+                MIN_TOLERANCE_PERCENT,
+            )
+            params.tolerance_percent = MIN_TOLERANCE_PERCENT
         self.params = params
         self._circuit = CircuitBreaker()
 
@@ -95,7 +108,14 @@ class SlippageProtectionEngine:
             raise ValueError("expected_amount must be positive")
         bps = config.MAX_SLIPPAGE_BPS
         min_amount = int(expected_amount * (10000 - bps) / 10000)
-        return max(1, min_amount)
+        result = max(1, min_amount)
+        logger.debug(
+            "Calculated protected slippage: expected=%d bps=%d result=%d",
+            expected_amount,
+            bps,
+            result,
+        )
+        return result
 
     @staticmethod
     def validate_transaction_slippage(expected_amount: int, actual_amount: int) -> None:
@@ -104,6 +124,14 @@ class SlippageProtectionEngine:
         if expected_amount <= 0 or actual_amount < 0:
             raise ValueError("invalid amounts")
         diff_bps = abs(expected_amount - actual_amount) * 10000 / expected_amount
+        logger.debug(
+            "Validating tx slippage: expected=%d actual=%d diff=%.2f bps",
+            expected_amount,
+            actual_amount,
+            diff_bps,
+        )
+        if diff_bps == 0:
+            raise PriceManipulationError(ZERO_SLIPPAGE_MSG)
         if diff_bps > config.MAX_SLIPPAGE_BPS:
             raise PriceManipulationError(
                 f"Slippage {diff_bps:.2f}bps exceeds max {config.MAX_SLIPPAGE_BPS}"
@@ -119,6 +147,8 @@ __all__ = [
     "MarketConditions",
     "SlippageParams",
     "SlippageProtectionEngine",
+    "MIN_TOLERANCE_PERCENT",
+    "ZERO_SLIPPAGE_MSG",
     "calculate_dynamic_slippage",
     "calculate_protected_slippage",
     "validate_transaction_slippage",

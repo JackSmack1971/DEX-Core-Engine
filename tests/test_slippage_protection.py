@@ -8,6 +8,8 @@ from slippage_protection import (
     MarketConditions,
     SlippageParams,
     SlippageProtectionEngine,
+    MIN_TOLERANCE_PERCENT,
+    ZERO_SLIPPAGE_MSG,
     calculate_dynamic_slippage,
 )
 from observability.metrics import SLIPPAGE_CHECKS, SLIPPAGE_REJECTED
@@ -95,3 +97,15 @@ def test_calculate_protected_slippage_and_validation(monkeypatch):
     SlippageProtectionEngine.validate_transaction_slippage(expected, min_out)
     with pytest.raises(PriceManipulationError):
         SlippageProtectionEngine.validate_transaction_slippage(expected, 900)
+
+
+def test_init_enforces_minimum_tolerance():
+    params = SlippageParams(tolerance_percent=0.01, data_api=None)
+    engine = SlippageProtectionEngine(params)
+    assert engine.params.tolerance_percent == MIN_TOLERANCE_PERCENT
+
+
+def test_zero_slippage_transaction_rejected(monkeypatch):
+    monkeypatch.setattr(config, "MAX_SLIPPAGE_BPS", 50)
+    with pytest.raises(PriceManipulationError, match=ZERO_SLIPPAGE_MSG):
+        SlippageProtectionEngine.validate_transaction_slippage(1000, 1000)
