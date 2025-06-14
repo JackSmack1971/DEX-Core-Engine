@@ -5,13 +5,23 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import (
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 
 from config import DatabaseSettings
 from exceptions import ServiceUnavailableError
 from logger import get_logger
 from utils.circuit_breaker import CircuitBreaker
 from utils.retry import retry_async
+from observability.metrics import (
+    DB_ACTIVE_CONNECTIONS,
+    DB_HEALTH_CHECKS,
+    DB_HEALTH_FAILURES,
+)
 
 
 class DatabaseService:
@@ -34,25 +44,35 @@ class DatabaseService:
         )
         self._circuit = CircuitBreaker()
 
-    async def get_session(self) -> AsyncSession:
+    @asynccontextmanager
+    async def get_session(self) -> AsyncIterator[AsyncSession]:
         async def _acquire() -> AsyncSession:
             return self._sessionmaker()
 
+        session: AsyncSession
         try:
-            return await self._circuit.call(retry_async, _acquire)
+            session = await self._circuit.call(retry_async, _acquire)
+            DB_ACTIVE_CONNECTIONS.inc()
+            DB_HEALTH_CHECKS.inc()
+            await session.execute(text("SELECT 1"))
+            await session.rollback()
+            yield session
         except Exception as exc:  # noqa: BLE001
+            DB_HEALTH_FAILURES.inc()
             self.logger.error("Session acquisition failed: %s", exc)
             raise ServiceUnavailableError("db session failure") from exc
+        finally:
+            if 'session' in locals():
+                await session.close()
+                DB_ACTIVE_CONNECTIONS.dec()
 
     @asynccontextmanager
     async def transaction(self) -> AsyncIterator[AsyncSession]:
-        session = await self.get_session()
-        try:
-            async with session.begin():
-                yield session
-        except Exception:  # noqa: BLE001
-            await session.rollback()
-            raise
-        finally:
-            await session.close()
+        async with self.get_session() as session:
+            try:
+                async with session.begin():
+                    yield session
+            except Exception:  # noqa: BLE001
+                await session.rollback()
+                raise
 

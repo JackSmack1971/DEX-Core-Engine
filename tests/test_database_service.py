@@ -6,6 +6,11 @@ import pytest
 from database.services import DatabaseService
 from sqlalchemy.ext.asyncio import create_async_engine
 from config import CONFIG_MANAGER, DatabaseSettings
+from observability.metrics import (
+    DB_ACTIVE_CONNECTIONS,
+    DB_HEALTH_CHECKS,
+    DB_HEALTH_FAILURES,
+)
 
 
 @pytest.mark.asyncio
@@ -20,8 +25,13 @@ async def test_get_session(monkeypatch):
         url="postgresql+asyncpg://user:pass@localhost/test"
     )
     service = DatabaseService(settings)
+    start_checks = DB_HEALTH_CHECKS._value.get()
     async with service.transaction() as session:
         assert session.bind
+        assert DB_ACTIVE_CONNECTIONS._value.get() > 0
+    assert DB_ACTIVE_CONNECTIONS._value.get() == 0
+    assert DB_HEALTH_CHECKS._value.get() == start_checks + 1
+    assert DB_HEALTH_FAILURES._value.get() == 0
 
 
 from database.models import Base, TradeExecution

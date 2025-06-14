@@ -24,6 +24,20 @@ RISK_ADJUSTED_PROFIT = Histogram(
 )
 PORTFOLIO_VALUE = Gauge('portfolio_value', 'Total portfolio value')
 REBALANCE_COUNT = Counter('portfolio_rebalance_total', 'Number of portfolio rebalances')
+
+# Database metrics
+DB_HEALTH_CHECKS = Counter(
+    'db_health_checks_total',
+    'Total number of database health checks',
+)
+DB_HEALTH_FAILURES = Counter(
+    'db_health_failures_total',
+    'Number of failed database health checks',
+)
+DB_ACTIVE_CONNECTIONS = Gauge(
+    'db_active_connections',
+    'Currently active database connections',
+)
 __all__ = [
     'TRADE_COUNT',
     'TRADE_SUCCESS',
@@ -36,4 +50,7 @@ __all__ = [
     'RISK_ADJUSTED_PROFIT',
     'PORTFOLIO_VALUE',
     'REBALANCE_COUNT',
+    'DB_HEALTH_CHECKS',
+    'DB_HEALTH_FAILURES',
+    'DB_ACTIVE_CONNECTIONS',
 ]
