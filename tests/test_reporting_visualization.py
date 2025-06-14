@@ -28,7 +28,8 @@ def test_prepare_visualization():
 
 
 @pytest.mark.asyncio
-async def test_report_export(tmp_path):
+async def test_report_export(tmp_path, monkeypatch):
+    monkeypatch.setenv("EXPORT_DIR", str(tmp_path))
     returns = [0.1] * 10
     report = generate_report("daily", returns)
     json_path = tmp_path / "r.json"

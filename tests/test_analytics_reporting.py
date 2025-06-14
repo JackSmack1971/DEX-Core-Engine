@@ -32,7 +32,8 @@ def test_generate_report():
 
 
 @pytest.mark.asyncio
-async def test_export_json_csv(tmp_path):
+async def test_export_json_csv(tmp_path, monkeypatch):
+    monkeypatch.setenv("EXPORT_DIR", str(tmp_path))
     data = {"a": 1, "b": 2}
     jpath = tmp_path / "f.json"
     cpath = tmp_path / "f.csv"
@@ -48,10 +49,33 @@ async def test_export_json_csv(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_export_invalid_extension(tmp_path):
+async def test_export_invalid_extension(tmp_path, monkeypatch):
+    monkeypatch.setenv("EXPORT_DIR", str(tmp_path))
     data = {"x": 1}
     bad = tmp_path / "bad.txt"
     with pytest.raises(ReportingError):
         await export_json(data, str(bad))
     with pytest.raises(ReportingError):
         await export_csv(data, str(bad))
+
+
+@pytest.mark.asyncio
+async def test_export_outside_allowed(tmp_path, monkeypatch):
+    monkeypatch.setenv("EXPORT_DIR", str(tmp_path))
+    data = {"z": 0}
+    outside = tmp_path.parent / "o.json"
+    with pytest.raises(ReportingError):
+        await export_json(data, str(outside))
+    with pytest.raises(ReportingError):
+        await export_csv(data, str(outside.with_suffix(".csv")))
+
+
+@pytest.mark.asyncio
+async def test_export_traversal(tmp_path, monkeypatch):
+    monkeypatch.setenv("EXPORT_DIR", str(tmp_path))
+    data = {"z": 0}
+    bad = tmp_path / ".." / "t.json"
+    with pytest.raises(ReportingError):
+        await export_json(data, str(bad))
+    with pytest.raises(ReportingError):
+        await export_csv(data, str(bad.with_suffix(".csv")))
