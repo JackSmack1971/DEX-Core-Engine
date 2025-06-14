@@ -3,7 +3,7 @@ from typing import Any
 
 import pytest
 
-from database.service import DatabaseService
+from database.services import DatabaseService
 from sqlalchemy.ext.asyncio import create_async_engine
 from config import CONFIG_MANAGER, DatabaseSettings
 
@@ -13,7 +13,9 @@ async def test_get_session(monkeypatch):
     def fake_engine(url: str, **kwargs: Any):
         return create_async_engine("sqlite+aiosqlite:///:memory:")
 
-    monkeypatch.setattr("database.service.create_async_engine", fake_engine)
+    monkeypatch.setattr(
+        "database.services.database.create_async_engine", fake_engine
+    )
     settings = DatabaseSettings(
         url="postgresql+asyncpg://user:pass@localhost/test"
     )
@@ -23,7 +25,7 @@ async def test_get_session(monkeypatch):
 
 
 from database.models import Base, TradeExecution
-from database.repositories.trade_repository import TradeRepository
+from database.repositories import TradeRepository
 
 
 @pytest.mark.asyncio
@@ -31,7 +33,9 @@ async def test_trade_repository_record_and_get(monkeypatch):
     def fake_engine(url: str, **kwargs: Any):
         return create_async_engine("sqlite+aiosqlite:///:memory:")
 
-    monkeypatch.setattr("database.service.create_async_engine", fake_engine)
+    monkeypatch.setattr(
+        "database.services.database.create_async_engine", fake_engine
+    )
     settings = DatabaseSettings(
         url="postgresql+asyncpg://user:pass@localhost/test"
     )

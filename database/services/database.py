@@ -1,3 +1,5 @@
+"""High level async database access service."""
+
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
