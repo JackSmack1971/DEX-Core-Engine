@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from strategies.base import BaseStrategy, StrategyConfig
+from strategies.base import BaseStrategy, StrategyConfig, StrategyMetrics
 from strategies.registry import StrategyRegistry
 from strategies.arbitrage import ArbitrageStrategy
 
@@ -12,7 +12,9 @@ class DummyStrategy(BaseStrategy):
     async def analyze_market(self) -> Dict[str, Any]:
         return {}
 
-    async def generate_signals(self, market_data: Dict[str, Any]) -> List[Dict[str, Any]]:
+    async def generate_signals(
+        self, market_data: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
         return []
 
     async def execute_trades(self, signals: List[Dict[str, Any]]) -> List[str]:
@@ -23,7 +25,9 @@ class DummyStrategy(BaseStrategy):
 async def test_registry_create_strategy():
     registry = StrategyRegistry()
     registry.register("dummy", DummyStrategy)
-    strat = registry.create_strategy("dummy", router=None, config=StrategyConfig(name="dummy"))
+    strat = registry.create_strategy(
+        "dummy", router=None, config=StrategyConfig(name="dummy")
+    )
     assert isinstance(strat, DummyStrategy)
     assert "dummy" in registry.list_strategies()
 
@@ -35,3 +39,11 @@ async def test_arbitrage_run_cycle(monkeypatch):
     strategy = ArbitrageStrategy(router)
     await strategy.run_cycle()
     assert strategy.metrics.total_trades >= 0
+
+
+def test_strategy_metrics_defaults():
+    metrics = StrategyMetrics()
+    assert metrics.sortino_ratio == 0.0
+    assert metrics.calmar_ratio == 0.0
+    assert metrics.profit_factor == 0.0
+    assert metrics.rolling_returns == []
