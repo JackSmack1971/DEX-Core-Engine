@@ -146,6 +146,29 @@ tx_hash = await batcher.execute([swap1_data, swap2_data], reorder=True)
 print("Batched transaction", tx_hash)
 ```
 
+### Database Migrations
+
+The project uses Alembic for schema management. Ensure the
+`DATABASE__URL` environment variable is set before running migrations.
+
+Generate a new migration after modifying models:
+
+```bash
+alembic revision --autogenerate -m "<description>"
+```
+
+Apply migrations to the database:
+
+```bash
+alembic upgrade head
+```
+
+You can revert the last migration with:
+
+```bash
+alembic downgrade -1
+```
+
 ## Resilience & Health Checks
 
 The project includes a small FastAPI application exposing `/health` and `/ready`

@@ -8,7 +8,6 @@ from .models import (
     MarketDataCache,
 )
 from .repositories import BaseRepository, TradeRepository
-from .services import DatabaseService
 
 __all__ = [
     "Base",
@@ -18,6 +17,5 @@ __all__ = [
     "MarketDataCache",
     "BaseRepository",
     "TradeRepository",
-    "DatabaseService",
 ]
 
