@@ -1,3 +1,4 @@
+import asyncio
 import pytest
 
 import slippage_protection
@@ -109,3 +110,48 @@ def test_zero_slippage_transaction_rejected(monkeypatch):
     monkeypatch.setattr(config, "MAX_SLIPPAGE_BPS", 50)
     with pytest.raises(PriceManipulationError, match=ZERO_SLIPPAGE_MSG):
         SlippageProtectionEngine.validate_transaction_slippage(1000, 1000)
+
+
+@pytest.mark.asyncio
+async def test_check_rejects_with_zero_tolerance(monkeypatch):
+    monkeypatch.setattr(slippage_protection, "MIN_TOLERANCE_PERCENT", 0.0)
+    params = SlippageParams(tolerance_percent=0.0, data_api="http://test")
+    engine = SlippageProtectionEngine(params)
+
+    async def fake_fetch() -> MarketConditions:
+        return MarketConditions(price=101.0, liquidity=50.0, volatility=0.1)
+
+    monkeypatch.setattr(engine, "_fetch_market_data", fake_fetch)
+    with pytest.raises(PriceManipulationError):
+        await engine.check(100.0, 10)
+
+
+@pytest.mark.asyncio
+async def test_large_trade_amount_triggers_penalty(monkeypatch):
+    params = SlippageParams(tolerance_percent=5.0, data_api="http://test")
+    engine = SlippageProtectionEngine(params)
+    warnings: list[str] = []
+
+    async def fake_fetch() -> MarketConditions:
+        return MarketConditions(price=100.0, liquidity=10.0, volatility=0.1)
+
+    monkeypatch.setattr(engine, "_fetch_market_data", fake_fetch)
+    monkeypatch.setattr(
+        slippage_protection,
+        "logger",
+        type(
+            "L",
+            (),
+            {
+                "warning": lambda msg, *a, **k: warnings.append(msg),
+                "info": lambda *a, **k: None,
+            },
+        ),
+    )
+    await engine.check(100.0, 20)
+    assert any("exceeds liquidity" in w for w in warnings)
+
+
+def test_dynamic_slippage_high_volatility():
+    result = calculate_dynamic_slippage(0.2, 0.8)
+    assert result == pytest.approx(0.2 * 1.8)
