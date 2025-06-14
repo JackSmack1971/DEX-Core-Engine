@@ -5,54 +5,49 @@ from .trading import MarketDataCache, StrategyPerformance, TradeExecution
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, Integer, String
+from sqlalchemy import DateTime, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 
-class ConfigurationVersion(TimestampedModel, Base):
+class ConfigurationVersion(TimestampedModel):
     """Track configuration versions."""
 
     __tablename__ = "configuration_version"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
     version: Mapped[str] = mapped_column(String(50), unique=True)
 
 
-class UserSession(TimestampedModel, Base):
+class UserSession(TimestampedModel):
     """Session information for platform users."""
 
     __tablename__ = "user_session"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
     session_id: Mapped[str] = mapped_column(String(64), unique=True)
     ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
-class AuditLog(TimestampedModel, Base):
+class AuditLog(TimestampedModel):
     """Record user and system actions."""
 
     __tablename__ = "audit_log"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
     action: Mapped[str] = mapped_column(String(100))
     context: Mapped[str] = mapped_column(String)
 
 
-class PortfolioSnapshot(TimestampedModel, Base):
+class PortfolioSnapshot(TimestampedModel):
     """Snapshot of current portfolio state."""
 
     __tablename__ = "portfolio_snapshot"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
     data: Mapped[str] = mapped_column(String)
 
 
-class RiskEvent(TimestampedModel, Base):
+class RiskEvent(TimestampedModel):
     """Risk-related events for auditing."""
 
     __tablename__ = "risk_event"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
     event_type: Mapped[str] = mapped_column(String(50))
     description: Mapped[str] = mapped_column(String)
 
