@@ -24,6 +24,7 @@ from web3.exceptions import TimeExhausted
 
 from logger import get_logger
 from observability.decorators import log_and_measure
+from security import SecureKeyManager, secure_zero_memory
 
 logger = get_logger("web3_service")
 
@@ -42,13 +43,14 @@ class TransactionTimeoutError(Exception):
 class Web3Service:
     """A service to handle all Ethereum blockchain interactions."""
 
-    def __init__(self, rpc_url: str, private_key: str):
+    def __init__(self, rpc_url: str, encrypted_private_key: str):
         """
         Initializes the connection to the Ethereum node.
 
         Args:
             rpc_url: The HTTP provider URL for the Ethereum node.
-            private_key: The private key for signing transactions.
+            encrypted_private_key: The encrypted private key for signing
+            transactions.
         """
         self.web3 = Web3(HTTPProvider(rpc_url))
         # Inject middleware for POA chains like Polygon, Rinkeby, etc.
@@ -57,7 +59,12 @@ class Web3Service:
         if not self.web3.is_connected():
             raise ConnectionError("Failed to connect to Ethereum node.")
 
-        self.account = self.web3.eth.account.from_key(private_key)
+        key_manager = SecureKeyManager()
+        private_key = key_manager.decrypt_private_key(encrypted_private_key)
+        try:
+            self.account = self.web3.eth.account.from_key(private_key)
+        finally:
+            secure_zero_memory(bytearray(private_key, "utf-8"))
         self.web3.eth.default_account = self.account.address
 
     def get_contract(self, address: str, abi: List[Dict]) -> Contract:

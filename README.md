@@ -85,7 +85,7 @@ The required dependencies are listed in `requirements.txt`.
    
 Create a .env file in the project's root directory. You can copy the .env.example file if it exists, or create one from scratch.
 
-🔒 IMPORTANT SECURITY NOTICE The PRIVATE_KEY grants full control over your wallet.
+🔒 IMPORTANT SECURITY NOTICE The encrypted private key grants full control over your wallet.
 • Never share this key or commit the .env file to version control.
 • It is highly recommended to use a new, dedicated "hot wallet" for this bot with a limited amount of funds.
 Your .env file should look like this:
@@ -94,8 +94,9 @@ Your .env file should look like this:
 RPC_URL="YOUR_RPC_URL_HERE"
 
 # Wallet credentials
-# WARNING: This is your private key. Keep it secret, keep it safe.
-PRIVATE_KEY="YOUR_WALLET_PRIVATE_KEY_HERE"
+# WARNING: Private keys must be encrypted using SecureKeyManager.
+ENCRYPTED_PRIVATE_KEY="PASTE_ENCRYPTED_KEY_HERE"
+MASTER_PASSWORD="your-password"
 WALLET_ADDRESS="YOUR_WALLET_PUBLIC_ADDRESS_HERE"
 
 # Token and DEX configuration

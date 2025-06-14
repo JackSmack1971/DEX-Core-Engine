@@ -14,6 +14,7 @@ from pydantic_settings import (
     SettingsConfigDict,
 )
 from web3 import Web3
+from security import SecureKeyManager
 
 from exceptions import ConfigurationError
 
@@ -101,7 +102,7 @@ class AppConfig(BaseSettings):
     model_config = SettingsConfigDict(env_nested_delimiter="__")
 
     rpc_url: str
-    private_key: str
+    encrypted_private_key: str
     wallet_address: str
     token0_address: str
     token1_address: str
@@ -123,6 +124,12 @@ class AppConfig(BaseSettings):
     slippage_protection: SlippageProtectionSettings
     portfolio: PortfolioSettings
     database: DatabaseSettings
+
+    @property
+    def private_key(self) -> str:
+        """Decrypt the stored encrypted private key."""
+        key_manager = SecureKeyManager()
+        return key_manager.decrypt_private_key(self.encrypted_private_key)
 
     @classmethod
     def settings_customise_sources(
@@ -198,7 +205,7 @@ class ConfigManager:
 def _update_globals(cfg: AppConfig) -> None:
     mapping = {
         "RPC_URL": cfg.rpc_url,
-        "PRIVATE_KEY": cfg.private_key,
+        "ENCRYPTED_PRIVATE_KEY": cfg.encrypted_private_key,
         "WALLET_ADDRESS": cfg.wallet_address,
         "TOKEN0_ADDRESS": cfg.token0_address,
         "TOKEN1_ADDRESS": cfg.token1_address,
@@ -244,7 +251,7 @@ CONFIG_MANAGER = ConfigManager()
 
 cfg = CONFIG_MANAGER.config
 RPC_URL = cfg.rpc_url
-PRIVATE_KEY = cfg.private_key
+ENCRYPTED_PRIVATE_KEY = cfg.encrypted_private_key
 WALLET_ADDRESS = cfg.wallet_address
 TOKEN0_ADDRESS = cfg.token0_address
 TOKEN1_ADDRESS = cfg.token1_address
@@ -286,7 +293,7 @@ DATABASE__ECHO = cfg.database.echo
 __all__ = [
     "CONFIG_MANAGER",
     "RPC_URL",
-    "PRIVATE_KEY",
+    "ENCRYPTED_PRIVATE_KEY",
     "WALLET_ADDRESS",
     "TOKEN0_ADDRESS",
     "TOKEN1_ADDRESS",

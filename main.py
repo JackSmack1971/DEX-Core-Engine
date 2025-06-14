@@ -29,7 +29,9 @@ def main() -> None:
 
     try:
         # 1. Initialize Web3 Service
-        web3_service = Web3Service(config.RPC_URL, config.PRIVATE_KEY)
+        web3_service = Web3Service(
+            config.RPC_URL, config.ENCRYPTED_PRIVATE_KEY
+        )
         logger.info("Connected to Ethereum node. Wallet: %s", config.WALLET_ADDRESS)
 
         # 2. Initialize DEX Handlers for Uniswap and Sushiswap
