@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Abstract strategy classes and metrics."""
+
+from __future__ import annotations
 
 import asyncio
 from abc import ABC, abstractmethod

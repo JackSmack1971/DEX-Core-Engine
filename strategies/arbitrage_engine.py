@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Advanced arbitrage engine handling multiple arbitrage types."""
+
+from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum

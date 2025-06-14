@@ -8,9 +8,9 @@ from collections.abc import Awaitable, Callable
 from typing import Any
 
 from logger import get_logger
+from exceptions import ServiceUnavailableError
 
 logger = get_logger("circuit_breaker")
-from exceptions import ServiceUnavailableError
 
 
 class CircuitBreaker:

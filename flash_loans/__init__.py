@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Flash loan utilities and providers."""
+
+from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from typing import Awaitable, Callable

@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Bridge price providers for cross-chain arbitrage."""
+
+from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
