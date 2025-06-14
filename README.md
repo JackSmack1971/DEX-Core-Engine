@@ -152,6 +152,10 @@ The project includes a small FastAPI application exposing `/health` and `/ready`
 endpoints with request rate limiting. DEX interactions are guarded by a circuit
 breaker and all blockchain calls use exponential backoff to handle transient
 failures.
+## Analytics
+
+Real-time P&L tracking captures every trade and updates asset prices as they arrive. The reporting module aggregates these metrics to generate periodic summaries including total returns, averages, and drawdowns. Reports can be exported to JSON or CSV for dashboards or further analysis.
+
 
 🧩 How to Extend the Bot
 The modular design makes it easy to add new strategies. To create your own:
