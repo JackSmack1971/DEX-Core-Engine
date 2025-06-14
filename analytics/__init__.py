@@ -10,6 +10,12 @@ from .visualization import (
     prepare_drawdown,
     prepare_dashboard_data,
 )
+from .metrics import (
+    ANALYTICS_PNL,
+    ANALYTICS_DRAWDOWN,
+    ROLLING_PERFORMANCE_7D,
+    ROLLING_PERFORMANCE_30D,
+)
 
 __all__ = [
     "AnalyticsEngine",
@@ -21,5 +27,9 @@ __all__ = [
     "prepare_pl_curve",
     "prepare_drawdown",
     "prepare_dashboard_data",
+    "ANALYTICS_PNL",
+    "ANALYTICS_DRAWDOWN",
+    "ROLLING_PERFORMANCE_7D",
+    "ROLLING_PERFORMANCE_30D",
 ]
 
