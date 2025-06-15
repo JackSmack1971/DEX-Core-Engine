@@ -7,7 +7,15 @@ from pathlib import Path
 from typing import Any
 
 from dotenv import load_dotenv
-from pydantic import BaseModel, Field, PostgresDsn, ValidationError, validator
+from cryptography.fernet import Fernet
+from pydantic import (
+    BaseModel,
+    Field,
+    PostgresDsn,
+    ValidationError,
+    validator,
+    field_validator,
+)
 from pydantic_settings import (
     BaseSettings,
     PydanticBaseSettingsSource,
@@ -94,6 +102,18 @@ class DatabaseSettings(BaseSettings):
     pool_timeout: int = Field(30, ge=5, le=120)
     pool_recycle: int = Field(3600, ge=300)
     echo: bool = Field(False, description="Enable SQL query logging")
+    require_ssl: bool = Field(True, description="Require SSL connections")
+    encryption_key: str
+    audit_encryption_key: str
+    query_timeout: int
+
+    @field_validator("encryption_key", "audit_encryption_key")
+    @classmethod
+    def _check_fernet_key(cls, value: str) -> str:
+        if len(value) != 44:
+            raise ValueError("Fernet key must be 44 characters")
+        Fernet(value)
+        return value
 
 
 class AppConfig(BaseSettings):
@@ -243,6 +263,10 @@ def _update_globals(cfg: AppConfig) -> None:
         "DATABASE__POOL_TIMEOUT": cfg.database.pool_timeout,
         "DATABASE__POOL_RECYCLE": cfg.database.pool_recycle,
         "DATABASE__ECHO": cfg.database.echo,
+        "DATABASE__REQUIRE_SSL": cfg.database.require_ssl,
+        "DATABASE__ENCRYPTION_KEY": cfg.database.encryption_key,
+        "DATABASE__AUDIT_ENCRYPTION_KEY": cfg.database.audit_encryption_key,
+        "DATABASE__QUERY_TIMEOUT": cfg.database.query_timeout,
     }
     globals().update(mapping)
 
@@ -289,6 +313,10 @@ DATABASE__MAX_OVERFLOW = cfg.database.max_overflow
 DATABASE__POOL_TIMEOUT = cfg.database.pool_timeout
 DATABASE__POOL_RECYCLE = cfg.database.pool_recycle
 DATABASE__ECHO = cfg.database.echo
+DATABASE__REQUIRE_SSL = cfg.database.require_ssl
+DATABASE__ENCRYPTION_KEY = cfg.database.encryption_key
+DATABASE__AUDIT_ENCRYPTION_KEY = cfg.database.audit_encryption_key
+DATABASE__QUERY_TIMEOUT = cfg.database.query_timeout
 
 __all__ = [
     "CONFIG_MANAGER",
@@ -331,4 +359,8 @@ __all__ = [
     "DATABASE__POOL_TIMEOUT",
     "DATABASE__POOL_RECYCLE",
     "DATABASE__ECHO",
+    "DATABASE__REQUIRE_SSL",
+    "DATABASE__ENCRYPTION_KEY",
+    "DATABASE__AUDIT_ENCRYPTION_KEY",
+    "DATABASE__QUERY_TIMEOUT",
 ]

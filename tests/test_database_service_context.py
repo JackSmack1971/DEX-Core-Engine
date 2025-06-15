@@ -36,7 +36,12 @@ async def test_get_session_failure(monkeypatch) -> None:
         fake_engine,
     )
     service = DatabaseService(
-        DatabaseSettings(url="postgresql+asyncpg://user:pass@localhost/test")
+        DatabaseSettings(
+            url="postgresql+asyncpg://user:pass@localhost/test",
+            encryption_key="8ZUJoRb_GXBDTPjL_Q0msBmE0vpo-hDabEIUkfGfs04=",
+            audit_encryption_key="oh-tvfXPINv_kIWFlUufdfrwqcoYlEtp6SuMziSRVLI=",
+            query_timeout=30,
+        )
     )
     dummy = DummyFailSession()
     service._sessionmaker = lambda: dummy
