@@ -31,8 +31,10 @@ class AuditLog(TimestampedModel):
 
     __tablename__ = "audit_log"
 
+    correlation_id: Mapped[str] = mapped_column(String(32), index=True)
     action: Mapped[str] = mapped_column(String(100))
     context: Mapped[str] = mapped_column(String)
+    context_hash: Mapped[str] = mapped_column(String(64))
 
 
 class PortfolioSnapshot(TimestampedModel):
