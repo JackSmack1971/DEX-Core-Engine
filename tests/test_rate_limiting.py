@@ -77,3 +77,27 @@ def test_decorator(monkeypatch: pytest.MonkeyPatch) -> None:
     with pytest.raises(HTTPException) as exc:
         asyncio.run(handler(current_user=user))
     assert exc.value.status_code == 429
+
+
+@pytest.mark.asyncio
+async def test_async_rate_limit_enforcement(monkeypatch: pytest.MonkeyPatch) -> None:
+    client = DummyRedis()
+    _patch_client(monkeypatch, client)
+    await rate_limiting.check_rate_limit("u", "scope", 1, 1)
+    with pytest.raises(RateLimitError):
+        await rate_limiting.check_rate_limit("u", "scope", 1, 1)
+
+
+@pytest.mark.asyncio
+async def test_async_decorator(monkeypatch: pytest.MonkeyPatch) -> None:
+    client = DummyRedis()
+    _patch_client(monkeypatch, client)
+
+    @rate_limiting.rate_limit("scope", 1, 1)
+    async def handler(current_user):
+        return "ok"
+
+    user = SimpleNamespace(username="u")
+    assert await handler(current_user=user) == "ok"
+    with pytest.raises(HTTPException):
+        await handler(current_user=user)
