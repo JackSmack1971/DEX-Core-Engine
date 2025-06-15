@@ -6,6 +6,16 @@
 *   **Embrace Pythonic Idioms:** Use Python’s idiomatic ways of writing code, which are often more readable and efficient.
 *   **Balance Trade-offs:** Understand that conflicts between different code quality characteristics (e.g., readability vs. efficiency) are common; prioritize based on specific project requirements, team skills, and context.
 
+## Documentation Standards
+- Use clear, beginner-friendly language
+- Include practical examples for each feature
+- Maintain consistent formatting throughout
+- Focus on getting users up and running quickly
+
+## Project-Specific Notes
+- This is a [describe project type: web app/API/CLI tool/etc.]
+- Primary users are [developers/end-users/both]
+- Key features include [list 3-5 main features]
 **2. Code Style & Readability**
 *   **Indentation:** Use 4 spaces per indentation level consistently. For continuation lines, align wrapped elements vertically or use a hanging indent without arguments on the first line.
 *   **Line Length:** Limit all lines to a maximum of 79 characters, and 72 characters for docstrings and comments. Break long lines using Python’s implicit line joining inside parentheses, brackets, or braces, preferring breaks before binary operators for new code.
