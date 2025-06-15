@@ -222,53 +222,65 @@ class ConfigManager:
         return self._config
 
 
+GLOBAL_ATTRS: dict[str, str | tuple[str, ...]] = {
+    "RPC_URL": "rpc_url",
+    "ENCRYPTED_PRIVATE_KEY": "encrypted_private_key",
+    "WALLET_ADDRESS": "wallet_address",
+    "TOKEN0_ADDRESS": "token0_address",
+    "TOKEN1_ADDRESS": "token1_address",
+    "UNISWAP_V2_ROUTER": "uniswap_v2_router",
+    "SUSHISWAP_ROUTER": "sushiswap_router",
+    "UNISWAP_V3_QUOTER": "uniswap_v3_quoter",
+    "UNISWAP_V3_ROUTER": "uniswap_v3_router",
+    "CURVE_POOL": "curve_pool",
+    "BALANCER_VAULT": "balancer_vault",
+    "BALANCER_POOL_ID": "balancer_pool_id",
+    "PROFIT_THRESHOLD": "profit_threshold",
+    "POLL_INTERVAL_SECONDS": "poll_interval_seconds",
+    "SLIPPAGE_TOLERANCE_PERCENT": "slippage_tolerance_percent",
+    "MAX_POSITION_SIZE": ("trading", "max_position_size"),
+    "RISK_LIMIT": ("trading", "risk_limit"),
+    "MAX_DAILY_VOLUME": ("trading", "max_daily_volume"),
+    "MAX_DRAWDOWN_PERCENT": ("risk", "max_drawdown_percent"),
+    "STOP_LOSS_PERCENT": ("risk", "stop_loss_percent"),
+    "TAKE_PROFIT_PERCENT": ("risk", "take_profit_percent"),
+    "GAS_LIMIT": ("dex", "gas_limit"),
+    "TX_TIMEOUT": ("dex", "tx_timeout"),
+    "MEV_PROTECTION_ENABLED": ("mev", "enabled"),
+    "FLASHBOTS_URL": ("mev", "flashbots_url"),
+    "FORK_RPC_URL": ("mev", "fork_rpc_url"),
+    "DEVIATION_THRESHOLD": ("mev", "deviation_threshold"),
+    "BATCH_TRANSACTIONS_ENABLED": ("batch", "enabled"),
+    "MULTICALL_ADDRESS": ("batch", "multicall_address"),
+    "DYNAMIC_SLIPPAGE_ENABLED": ("slippage_protection", "dynamic_slippage_enabled"),
+    "MAX_SLIPPAGE_BPS": ("slippage_protection", "max_slippage_bps"),
+    "REBALANCE_THRESHOLD": ("portfolio", "rebalance_threshold"),
+    "MAX_PORTFOLIO_ASSETS": ("portfolio", "max_assets"),
+    "DATABASE__URL": ("database", "url"),
+    "DATABASE__POOL_SIZE": ("database", "pool_size"),
+    "DATABASE__MAX_OVERFLOW": ("database", "max_overflow"),
+    "DATABASE__POOL_TIMEOUT": ("database", "pool_timeout"),
+    "DATABASE__POOL_RECYCLE": ("database", "pool_recycle"),
+    "DATABASE__ECHO": ("database", "echo"),
+    "DATABASE__REQUIRE_SSL": ("database", "require_ssl"),
+    "DATABASE__ENCRYPTION_KEY": ("database", "encryption_key"),
+    "DATABASE__AUDIT_ENCRYPTION_KEY": ("database", "audit_encryption_key"),
+    "DATABASE__QUERY_TIMEOUT": ("database", "query_timeout"),
+}
+
+
+def _resolve_attr(cfg: AppConfig, path: str | tuple[str, ...]):
+    value = cfg
+    if isinstance(path, str):
+        return getattr(value, path)
+    for part in path:
+        value = getattr(value, part)
+    return value
+
+
 def _update_globals(cfg: AppConfig) -> None:
-    mapping = {
-        "RPC_URL": cfg.rpc_url,
-        "ENCRYPTED_PRIVATE_KEY": cfg.encrypted_private_key,
-        "WALLET_ADDRESS": cfg.wallet_address,
-        "TOKEN0_ADDRESS": cfg.token0_address,
-        "TOKEN1_ADDRESS": cfg.token1_address,
-        "UNISWAP_V2_ROUTER": cfg.uniswap_v2_router,
-        "SUSHISWAP_ROUTER": cfg.sushiswap_router,
-        "UNISWAP_V3_QUOTER": cfg.uniswap_v3_quoter,
-        "UNISWAP_V3_ROUTER": cfg.uniswap_v3_router,
-        "CURVE_POOL": cfg.curve_pool,
-        "BALANCER_VAULT": cfg.balancer_vault,
-        "BALANCER_POOL_ID": cfg.balancer_pool_id,
-        "PROFIT_THRESHOLD": cfg.profit_threshold,
-        "POLL_INTERVAL_SECONDS": cfg.poll_interval_seconds,
-        "SLIPPAGE_TOLERANCE_PERCENT": cfg.slippage_tolerance_percent,
-        "MAX_POSITION_SIZE": cfg.trading.max_position_size,
-        "RISK_LIMIT": cfg.trading.risk_limit,
-        "MAX_DAILY_VOLUME": cfg.trading.max_daily_volume,
-        "MAX_DRAWDOWN_PERCENT": cfg.risk.max_drawdown_percent,
-        "STOP_LOSS_PERCENT": cfg.risk.stop_loss_percent,
-        "TAKE_PROFIT_PERCENT": cfg.risk.take_profit_percent,
-        "GAS_LIMIT": cfg.dex.gas_limit,
-        "TX_TIMEOUT": cfg.dex.tx_timeout,
-        "MEV_PROTECTION_ENABLED": cfg.mev.enabled,
-        "FLASHBOTS_URL": cfg.mev.flashbots_url,
-        "FORK_RPC_URL": cfg.mev.fork_rpc_url,
-        "DEVIATION_THRESHOLD": cfg.mev.deviation_threshold,
-        "BATCH_TRANSACTIONS_ENABLED": cfg.batch.enabled,
-        "MULTICALL_ADDRESS": cfg.batch.multicall_address,
-        "DYNAMIC_SLIPPAGE_ENABLED": cfg.slippage_protection.dynamic_slippage_enabled,
-        "MAX_SLIPPAGE_BPS": cfg.slippage_protection.max_slippage_bps,
-        "REBALANCE_THRESHOLD": cfg.portfolio.rebalance_threshold,
-        "MAX_PORTFOLIO_ASSETS": cfg.portfolio.max_assets,
-        "DATABASE__URL": cfg.database.url,
-        "DATABASE__POOL_SIZE": cfg.database.pool_size,
-        "DATABASE__MAX_OVERFLOW": cfg.database.max_overflow,
-        "DATABASE__POOL_TIMEOUT": cfg.database.pool_timeout,
-        "DATABASE__POOL_RECYCLE": cfg.database.pool_recycle,
-        "DATABASE__ECHO": cfg.database.echo,
-        "DATABASE__REQUIRE_SSL": cfg.database.require_ssl,
-        "DATABASE__ENCRYPTION_KEY": cfg.database.encryption_key,
-        "DATABASE__AUDIT_ENCRYPTION_KEY": cfg.database.audit_encryption_key,
-        "DATABASE__QUERY_TIMEOUT": cfg.database.query_timeout,
-    }
-    globals().update(mapping)
+    for name, path in GLOBAL_ATTRS.items():
+        globals()[name] = _resolve_attr(cfg, path)
 
 
 CONFIG_MANAGER = ConfigManager()

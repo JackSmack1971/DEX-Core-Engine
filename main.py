@@ -20,6 +20,29 @@ from logger import get_logger, set_correlation_id
 logger = get_logger("main")
 
 
+def setup_web3_service() -> Web3Service:
+    """Initialize the Web3 service."""
+    service = Web3Service(config.RPC_URL, config.ENCRYPTED_PRIVATE_KEY)
+    logger.info("Connected to Ethereum node. Wallet: %s", config.WALLET_ADDRESS)
+    return service
+
+
+def setup_dex_handlers(web3_service: Web3Service) -> List[DEXHandler]:
+    """Create DEX handlers for configured routers."""
+    handlers = [
+        DEXHandler(web3_service, config.UNISWAP_V2_ROUTER),
+        DEXHandler(web3_service, config.SUSHISWAP_ROUTER),
+    ]
+    logger.info("DEX handlers initialized.")
+    return handlers
+
+
+async def launch_strategy(dex_handlers: List[DEXHandler]) -> None:
+    """Run the arbitrage strategy."""
+    strategy = ArbitrageStrategy(dex_handlers)
+    await strategy.run()
+
+
 def main() -> None:
     """
     Sets up and runs the trading bot.
@@ -28,22 +51,9 @@ def main() -> None:
     logger.info("Initializing Ethereum Trading Bot...")
 
     try:
-        # 1. Initialize Web3 Service
-        web3_service = Web3Service(
-            config.RPC_URL, config.ENCRYPTED_PRIVATE_KEY
-        )
-        logger.info("Connected to Ethereum node. Wallet: %s", config.WALLET_ADDRESS)
-
-        # 2. Initialize DEX Handlers for Uniswap and Sushiswap
-        dex_handlers: List[DEXHandler] = [
-            DEXHandler(web3_service, config.UNISWAP_V2_ROUTER),
-            DEXHandler(web3_service, config.SUSHISWAP_ROUTER)
-        ]
-        logger.info("DEX handlers initialized.")
-
-        # 3. Initialize and run the trading strategy
-        strategy = ArbitrageStrategy(dex_handlers)
-        asyncio.run(strategy.run())
+        web3_service = setup_web3_service()
+        dex_handlers = setup_dex_handlers(web3_service)
+        asyncio.run(launch_strategy(dex_handlers))
 
     except (ConfigurationError, DexError, StrategyError, ConnectionError) as e:
         logger.error("Initialization failed: %s", e)
