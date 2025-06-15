@@ -1,192 +1,176 @@
 # DEX-Core-Engine
-## Python DEX Trading Bot
 
-![Python Version](https://img.shields.io/badge/python-3.9+-blue.svg)
-![Code Style](https://img.shields.io/badge/code%20style-black-000000.svg)
-![License](https://img.shields.io/badge/license-MIT-green.svg)
+## Overview
 
-A modular and production-ready framework for a simple Ethereum trading bot that operates exclusively on Decentralized Exchanges (DEXs). This project is built with a strong emphasis on Python best practices, security, and extensibility.
+DEX-Core-Engine is a modular Ethereum trading bot focused on decentralized exchanges (DEXs). It provides a flexible framework with security, observability, and risk management features so new strategies can be implemented quickly.
 
-The default strategy implements a simple arbitrage mechanism, monitoring prices between two Uniswap V2-compatible DEXs (e.g., Uniswap and Sushiswap) and identifying profitable trading opportunities.
+### Feature Highlights
+- **Multi-DEX Arbitrage** – Uniswap V2/V3, Curve, and Balancer adapters with multi-hop routing
+- **Flash Loan & Cross-Chain Support** – Optional flash-loan based arbitrage and bridge price providers
+- **Dynamic Slippage & MEV Protection** – Automated slippage checks and optional Flashbots submission
+- **Batch Transactions** – Multicall batching to reduce gas usage
+- **Portfolio & Risk Management** – Position sizing, drawdown limits, portfolio rebalancing
+- **Analytics & Reporting** – Prometheus metrics, P&L reporting and export utilities
+- **Resilience Utilities** – Circuit breaker, retry logic and Redis caching
+- **REST API** – FastAPI application exposing health, metrics and analytics endpoints
 
-***
-
-## 🚀 Key Features
-
-* **Modular Architecture**: 
-The code is logically separated into components for configuration, blockchain interaction, DEX handling, and trading strategy. 
-This follows the **Single Responsibility Principle**, making the codebase easy to understand, test, and maintain.
-* **Arbitrage Strategy**: A simple, functional arbitrage strategy that monitors a token pair (WETH/DAI by default) across two DEXs.
-* **Secure by Design**: Manages sensitive data like private keys and RPC URLs through environment variables, preventing credentials from being hardcoded in source code.
-* **Robust Error Handling**: Implements specific exception handling for network issues and failed transactions, ensuring the bot operates reliably.
-* **Extensible Framework**: The decoupled design allows developers to easily implement and plug in new, more complex trading strategies without modifying the core boilerplate.
-* **Adherence to Best Practices**: Built from the ground up following industry-standard Python best practices, including PEP 8 compliance, comprehensive typing, and clear documentation.
-* **Routing Engine**: Supports multi-hop swaps across Uniswap V3, Curve, and Balancer with cached path finding.
-* **Batch Transactions**: Optional multicall-based batching to reduce gas costs.
-* **MEV Protection**: Configurable flashbots submission and simulation to guard against front-running.
-
-## 🏗️ Project Architecture
-
-The bot is designed with a clean separation of concerns, ensuring that each part of the application has a distinct and focused purpose.
-
-  /├── .env # Local environment configuration (private)
-   ├── config.py # Loads and validates configuration from .env
-   ├── web3_service.py # Service layer for all web3.py blockchain interactions
-   ├── dex_handler.py # Abstraction for interacting with DEX router contracts
-   ├── strategy.py # Contains the trading logic (e.g., ArbitrageStrategy)
-   ├── main.py # Main entry point for the application
-   └── requirements.txt # Project dependencies
-
-
-1. **`config.py`**: Loads all required parameters (keys, addresses, thresholds) from the `.env` file. 
-
-2. **`web3_service.py`**: A service class that encapsulates all `web3.py` logic. It handles node connections, transaction signing, and sending. 
-
-3. **`dex_handler.py`**: Provides a high-level interface for DEX interactions, such as querying token prices and executing swaps. 
-
-4. **`strategy.py`**: Implements the actual trading logic. It uses the `DEXHandler` to get market data and act on it. 
-
-5. **`main.py`**: The application's entry point. It initializes all objects and starts the strategy's main loop. 
-
-## 🛠️ Tech Stack * 
-**Python 3.9+** * 
-**[web3.py](https://github.com/ethereum/web3.py)**: The primary library for interacting with the Ethereum blockchain. * 
-**[python-dotenv](https://github.com/theskumar/python-dotenv)**: For managing environment variables. 
-
-## ⚙️ Installation & Setup 
-Follow these steps to get your trading bot up and running. 
-
-### 1. Prerequisites 
-* Python 3.9 or newer. 
-* An Ethereum wallet with a small amount of ETH for gas fees. 
-* An RPC URL from a node provider like [Infura](https://infura.io/) or [Alchemy](https://www.alchemy.com/). 
-
-### 2. Clone the Repository 
-
+## Project Layout
 ```
-git clone <repository-url>
-cd python-dex-trading-bot
+├── main.py                 # Command line entry point
+├── config.py               # Pydantic-based configuration loader
+├── dex_handler.py          # Uniswap‑style DEX interaction
+├── routing/                # Multi-hop routing engine
+├── strategies/             # Strategy framework and implementations
+├── portfolio/              # Portfolio tracking and rebalancing
+├── database/               # Async ORM models and repositories
+├── analytics/              # Reporting and visualization tools
+├── security/               # Key encryption and MEV protection
+├── api/                    # FastAPI server with JWT auth
+└── tests/                  # Pytest suite
 ```
 
-3. Install Dependencies
-Create a virtual environment to manage project dependencies in isolation.
+## Installation
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   cd DEX-Core-Engine
+   ```
+2. **Create a virtual environment and install dependencies**
+   ```bash
+   python -m venv venv
+   source venv/bin/activate  # Windows: venv\Scripts\activate
+   pip install -r requirements.txt
+   ```
+   Python 3.9 or newer is required.
 
-# Create and activate a virtual environment
-```
-python -m venv venv
-source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
-```
-# Install required packages
-```
-pip install -r requirements.txt
-```
-The required dependencies are listed in `requirements.txt`.
-4. Configure Environment Variables
-   
-Create a .env file in the project's root directory. You can copy the .env.example file if it exists, or create one from scratch.
+## Environment Configuration
+All configuration is provided through environment variables. Copy `.env.example` and adjust values, then set additional variables as needed:
 
-🔒 IMPORTANT SECURITY NOTICE The encrypted private key grants full control over your wallet.
-• Never share this key or commit the .env file to version control.
-• It is highly recommended to use a new, dedicated "hot wallet" for this bot with a limited amount of funds.
-Your .env file should look like this:
 ```
-# Ethereum Node RPC URL from a provider like Infura or Alchemy
-RPC_URL="YOUR_RPC_URL_HERE"
-
-# Wallet credentials
-# WARNING: Private keys must be encrypted using SecureKeyManager.
-ENCRYPTED_PRIVATE_KEY="PASTE_ENCRYPTED_KEY_HERE"
-MASTER_PASSWORD="your-password"
-WALLET_ADDRESS="YOUR_WALLET_PUBLIC_ADDRESS_HERE"
-
-# Token and DEX configuration
-TOKEN0_ADDRESS="0xYourToken0"
-TOKEN1_ADDRESS="0xYourToken1"
-UNISWAP_V2_ROUTER="0xUniswapRouter"
-SUSHISWAP_ROUTER="0xSushiswapRouter"
-UNISWAP_V3_QUOTER="0xUniswapV3Quoter"
-UNISWAP_V3_ROUTER="0xUniswapV3Router"
-CURVE_POOL="0xCurvePool"
-BALANCER_VAULT="0xBalancerVault"
-BALANCER_POOL_ID="0xPoolId"
-MULTICALL_ADDRESS="0xMulticall"
+RPC_URL="..."                     # Ethereum node URL
+ENCRYPTED_PRIVATE_KEY="..."       # Output of SecureKeyManager
+MASTER_PASSWORD="..."             # Password used for decryption
+WALLET_ADDRESS="..."              # Your wallet address
+TOKEN0_ADDRESS="..."              # Token in
+TOKEN1_ADDRESS="..."              # Token out
+UNISWAP_V2_ROUTER="..."
+SUSHISWAP_ROUTER="..."
+UNISWAP_V3_QUOTER="..."
+UNISWAP_V3_ROUTER="..."
+CURVE_POOL="..."
+BALANCER_VAULT="..."
+BALANCER_POOL_ID="..."
+MULTICALL_ADDRESS="..."           # Required when batching
 MEV_PROTECTION_ENABLED=false
 BATCH_TRANSACTIONS_ENABLED=false
+PROFIT_THRESHOLD=1.0
+POLL_INTERVAL_SECONDS=10
+SLIPPAGE_TOLERANCE_PERCENT=0.5
+TRADING__MAX_POSITION_SIZE=1.0
+TRADING__RISK_LIMIT=0.02
+TRADING__MAX_DAILY_VOLUME=100
+RISK__MAX_DRAWDOWN_PERCENT=20
+RISK__STOP_LOSS_PERCENT=5
+RISK__TAKE_PROFIT_PERCENT=10
+DEX__GAS_LIMIT=250000
+DEX__TX_TIMEOUT=120
+MEV__FLASHBOTS_URL="..."
+MEV__FORK_RPC_URL="..."
+MEV__DEVIATION_THRESHOLD=0.05
+DYNAMIC_SLIPPAGE_ENABLED=false
+MAX_SLIPPAGE_BPS=50
+BATCH__MULTICALL_ADDRESS="..."
+REBALANCE_THRESHOLD=0.05
+MAX_PORTFOLIO_ASSETS=20
+DATABASE__URL="postgresql+asyncpg://user:pass@localhost/db"
+DATABASE__POOL_SIZE=5
+DATABASE__MAX_OVERFLOW=10
+DATABASE__POOL_TIMEOUT=30
+DATABASE__POOL_RECYCLE=3600
+DATABASE__ECHO=false
+MARKET_DATA_URL="https://api.example.com/slippage"
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_DB=0
+REDIS_PASSWORD=""
+REDIS_TIMEOUT=5
+FX_API_URL="https://fx.example.com"
+FX_API_KEY=""
+EXPORT_DIR=exports
+LOG_FILE=logs/dex_bot.log
+LOG_LEVEL=INFO
+JWT_SECRET_KEY="your-secret"
+JWT_ALGORITHM=HS256
+JWT_EXPIRE_MINUTES=15
+ALLOWED_HOSTS=localhost
+CORS_ORIGINS=http://localhost
+API_RATE_LIMIT=100
+KEY_SALT="optional-salt"
+APP_ENV=dev
 ```
 
-▶️ Usage
-To run the bot, execute the main.py script from the root of the project directory:
+### SecureKeyManager
+Run `SecureKeyManager.setup_encrypted_config()` in a Python shell with your plain private key in the `PRIVATE_KEY` environment variable to generate `ENCRYPTED_PRIVATE_KEY`.
 
+## Usage
+### Run the trading bot
+```bash
 python main.py
-
-The bot will initialize and begin polling the configured DEXs for trading opportunities. The console will display the current prices and whether a profitable opportunity has been found.
-Example Output:
 ```
-Initializing Ethereum Trading Bot... 
-Connected to Ethereum node. 
-Wallet: 0x... 
-DEX handlers initialized. 
---- Starting Arbitrage Trading Bot --- 
-Monitoring WETH / DAI pair. 
-DEX 1 Router: 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D 
-DEX 2 Router: 0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F ---------------------------------------- 
-Price DEX1: 3450.12 DAI | Price DEX2: 3451.50 DAI | Margin: 1.38 DAI
-No profitable opportunity found. Standing by. Waiting for 10 seconds...
+The bot initializes the Web3 connection, loads DEX handlers and starts the default `ArbitrageStrategy` loop.
+
+### Run the API server
+```bash
+uvicorn api:app --reload
 ```
+Endpoints:
+- `GET /health` – liveness probe
+- `GET /ready` – readiness probe
+- `GET /metrics` – Prometheus metrics (requires `analytics:read` permission)
+- `GET /analytics/report?period=<daily|weekly|monthly>`
+- `GET /analytics/performance?confidence=0.95`
+- `POST /admin/shutdown` – trigger emergency shutdown
 
-### Batch Transaction Example
+All protected routes use JWT authentication. Set `JWT_SECRET_KEY` and related variables before starting.
 
-When `BATCH_TRANSACTIONS_ENABLED` is true and `MULTICALL_ADDRESS` is
-configured, you can send multiple swaps in a single transaction:
-
+### Batch Transactions
+When `BATCH_TRANSACTIONS_ENABLED` and `MULTICALL_ADDRESS` are configured:
 ```python
 from batcher import Batcher
-
 batcher = Batcher(web3_service, MULTICALL_ADDRESS)
-tx_hash = await batcher.execute([swap1_data, swap2_data], reorder=True)
-print("Batched transaction", tx_hash)
+tx_hash = await batcher.execute([call1, call2], reorder=True)
+print(tx_hash)
 ```
 
 ### Database Migrations
-
-The project uses Alembic for schema management. Ensure the
-`DATABASE__URL` environment variable is set before running migrations.
-
-Generate a new migration after modifying models:
-
+Ensure `DATABASE__URL` is set.
 ```bash
-alembic revision --autogenerate -m "<description>"
-```
-
-Apply migrations to the database:
-
-```bash
+alembic revision --autogenerate -m "Message"
 alembic upgrade head
-```
-
-You can revert the last migration with:
-
-```bash
+# rollback:
 alembic downgrade -1
 ```
 
-## Resilience & Health Checks
+## Testing
+The repository includes extensive Pytest suites. To run all tests with coverage:
+```bash
+pytest --cov=.
+```
 
-The project includes a small FastAPI application exposing `/health` and `/ready`
-endpoints with request rate limiting. DEX interactions are guarded by a circuit
-breaker and all blockchain calls use exponential backoff to handle transient
-failures.
-## Analytics
+## Build & Deployment
+No npm/yarn scripts are provided. Deployment typically involves:
+1. Installing dependencies via `pip install -r requirements.txt` on the target server.
+2. Running database migrations.
+3. Starting the bot (`python main.py`) and/or the API server (`uvicorn api:app`).
+Configure environment variables according to the target environment (`APP_ENV`).
 
-Real-time P&L tracking captures every trade and updates asset prices as they arrive. The reporting module aggregates these metrics to generate periodic summaries including total returns, averages, and drawdowns. Reports can be exported to JSON or CSV for dashboards or further analysis.
+## Contributing
+Pull requests are welcome! Please follow these guidelines:
+1. Ensure code is formatted with `black` and includes type hints.
+2. Add unit tests for new functionality (aim for 80% coverage).
+3. Do not commit secrets—always use environment variables for credentials.
+4. Run `pytest` before submitting your PR.
+5. Describe any API changes clearly in the PR message.
 
-
-🧩 How to Extend the Bot
-The modular design makes it easy to add new strategies. To create your own:
-• Create a new class in strategy.py (e.g., MovingAverageStrategy).
-• Ensure it has a run() method that contains the main logic loop.
-• In main.py, instantiate your new strategy class instead of ArbitrageStrategy.
-This design promotes low coupling between the strategy logic and the underlying blockchain services.
-
-⚠️ Disclaimer
-This project is for educational purposes only and is not financial advice. Trading cryptocurrencies involves significant risk, including the potential for complete loss of funds. The author is not responsible for any financial losses incurred from the use of this software. Always do your own research and use this bot at your own risk.
+## License
+MIT
