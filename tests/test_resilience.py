@@ -5,7 +5,7 @@ import pytest
 from jose import jwt
 
 from api import app
-from api.auth import ALGORITHM, SECRET_KEY, UserRole
+from security.async_auth import ALGORITHM, SECRET_KEY
 from middleware.rate_limiter import RateLimiterMiddleware
 from utils.circuit_breaker import CircuitBreaker
 from utils.retry import retry_async
@@ -56,8 +56,10 @@ def test_rate_limit_and_health_endpoints():
     assert r.status_code == 429
 
 
-def _token(role: UserRole = UserRole.ADMIN) -> str:
-    return jwt.encode({"sub": "tester", "role": role.value}, SECRET_KEY, algorithm=ALGORITHM)
+def _token(scopes: list[str] | None = None) -> str:
+    if scopes is None:
+        scopes = ["admin"]
+    return jwt.encode({"sub": "tester", "scopes": scopes}, SECRET_KEY, algorithm=ALGORITHM)
 
 
 def test_metrics_endpoint():

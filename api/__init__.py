@@ -6,11 +6,11 @@ import os
 import time
 
 from fastapi import (
-    Depends,
     FastAPI,
     HTTPException,
     Request,
     Response,
+    Security,
     responses,
     status,
 )
@@ -24,7 +24,7 @@ from exceptions import AnalyticsAPIError, BaseAppError, RateLimitError
 from logger import get_logger
 from middleware.rate_limiter import RateLimiterMiddleware
 from risk_manager import RiskManager
-from api.auth import Permission, TokenData, require_permission
+from security.async_auth import TokenData, get_current_user
 
 risk_manager = RiskManager()
 logger = get_logger("api")
@@ -100,7 +100,7 @@ async def ready() -> dict[str, str]:
 @limiter.limit("10/minute")
 async def metrics(
     request: Request,
-    current_user: TokenData = Depends(require_permission(Permission.METRICS_READ)),
+    current_user: TokenData = Security(get_current_user, scopes=["admin"]),
 ) -> Response:
     """Protected metrics endpoint."""
     from prometheus_client import generate_latest
@@ -125,7 +125,7 @@ async def strategy_health() -> dict[str, str]:
 async def analytics_report(
     request: Request,
     period: str,
-    current_user: TokenData = Depends(require_permission(Permission.ANALYTICS_READ)),
+    current_user: TokenData = Security(get_current_user, scopes=["trading"]),
 ) -> dict:
     """Protected P&L report for the specified period."""
     if period not in {"daily", "weekly", "monthly"}:
@@ -146,7 +146,7 @@ async def analytics_report(
 async def analytics_performance(
     request: Request,
     confidence: float = 0.95,
-    current_user: TokenData = Depends(require_permission(Permission.ANALYTICS_READ)),
+    current_user: TokenData = Security(get_current_user, scopes=["high_value"]),
 ) -> dict:
     """Protected performance metrics."""
     if not 0 < confidence < 1:
@@ -165,7 +165,7 @@ async def analytics_performance(
 
 @app.post("/admin/shutdown")
 async def emergency_shutdown(
-    current_user: TokenData = Depends(require_permission(Permission.ADMIN_MANAGE)),
+    current_user: TokenData = Security(get_current_user, scopes=["admin"]),
 ) -> dict[str, str]:
     """Emergency shutdown endpoint."""
     risk_manager.shutdown()
