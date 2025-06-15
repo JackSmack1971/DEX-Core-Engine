@@ -6,6 +6,7 @@ from .models import (
     TradeExecution,
     StrategyPerformance,
     MarketDataCache,
+    AsyncFinancialAuditRecord,
 )
 from .repositories import BaseRepository, TradeRepository
 
@@ -15,6 +16,7 @@ __all__ = [
     "TradeExecution",
     "StrategyPerformance",
     "MarketDataCache",
+    "AsyncFinancialAuditRecord",
     "BaseRepository",
     "TradeRepository",
 ]

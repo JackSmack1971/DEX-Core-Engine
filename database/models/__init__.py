@@ -2,6 +2,7 @@
 
 from .base import Base, TimestampedModel
 from .trading import MarketDataCache, StrategyPerformance, TradeExecution
+from .audit_records import AsyncFinancialAuditRecord
 
 from datetime import datetime
 
@@ -65,5 +66,6 @@ __all__ = [
     "AuditLog",
     "PortfolioSnapshot",
     "RiskEvent",
+    "AsyncFinancialAuditRecord",
 ]
 
