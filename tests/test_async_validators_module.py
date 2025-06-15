@@ -152,3 +152,38 @@ async def test_check_compliance(monkeypatch):
     )
     await validator.check_compliance(req)
 
+
+@pytest.mark.asyncio
+async def test_check_compliance_fails(monkeypatch):
+    os.environ["COMPLIANCE_API_URL"] = "http://comp"
+    validator = AsyncFinancialTransactionValidator()
+    monkeypatch.setattr("httpx.AsyncClient", lambda timeout: DummyKYCClient(False))
+    req = EnhancedTradeRequest(
+        token_pair=(
+            "0x0000000000000000000000000000000000000001",
+            "0x0000000000000000000000000000000000000002",
+        ),
+        amount=1.0,
+        price=1.0,
+        metadata={"user": "bob"},
+    )
+    with pytest.raises(ComplianceError):
+        await validator.check_compliance(req)
+
+
+@pytest.mark.asyncio
+async def test_validate_request_custom_threshold(monkeypatch):
+    validator = AsyncFinancialTransactionValidator(threshold=0.4)
+    monkeypatch.setattr(validator, "check_compliance", AsyncMock())
+    monkeypatch.setattr(validator, "score_risk", AsyncMock(return_value=0.5))
+    req = EnhancedTradeRequest(
+        token_pair=(
+            "0x0000000000000000000000000000000000000001",
+            "0x0000000000000000000000000000000000000002",
+        ),
+        amount=1.0,
+        price=1.0,
+    )
+    with pytest.raises(ValidationError):
+        await validator.validate_request(req)
+

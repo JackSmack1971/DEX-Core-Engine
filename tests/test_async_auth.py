@@ -37,3 +37,16 @@ async def test_get_current_user_invalid_token():
     with pytest.raises(HTTPException) as exc:
         await get_current_user(SecurityScopes(), "badtoken")
     assert exc.value.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_get_current_user_multi_scope_success():
+    token = jwt.encode(
+        {"sub": "bob", "scopes": ["trading", "admin"]},
+        SECRET_KEY,
+        algorithm=ALGORITHM,
+    )
+    scopes = SecurityScopes(scopes=["trading", "admin"])
+    user = await get_current_user(scopes, token)
+    assert user.username == "bob"
+    assert set(scopes.scopes).issubset(set(user.scopes))
