@@ -6,21 +6,13 @@ import base64
 import getpass
 import os
 import secrets
-import ctypes
-import sys
 
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives.kdf.argon2 import Argon2id
 
+from .secure_memory import locked_memory, secure_zero_memory
 
-def secure_zero_memory(data: bytearray) -> None:
-    """Securely zero memory containing sensitive data."""
-    addr = ctypes.addressof(ctypes.c_char.from_buffer(data))
-    length = len(data)
-    if sys.platform == "win32":
-        ctypes.windll.kernel32.RtlSecureZeroMemory(addr, length)
-    else:
-        ctypes.memset(addr, 0, length)
+
 
 
 class SecureKeyManager:
@@ -54,9 +46,8 @@ class SecureKeyManager:
             data = self._fernet.decrypt(encrypted_key.encode())
         except Exception as exc:  # noqa: BLE001
             raise ValueError("Invalid encryption key or corrupted data") from exc
-        result = data.decode()
-        secure_zero_memory(bytearray(data))
-        return result
+        with locked_memory(data) as buf:
+            return buf.tobytes().decode()
 
     def setup_encrypted_config(self) -> None:
         """Print helper instructions for encrypting existing configs."""
@@ -72,4 +63,4 @@ class SecureKeyManager:
         return self.encrypt_private_key(new_private_key)
 
 
-__all__ = ["SecureKeyManager", "secure_zero_memory"]
+__all__ = ["SecureKeyManager", "secure_zero_memory", "locked_memory"]
