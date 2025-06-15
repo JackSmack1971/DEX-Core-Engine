@@ -52,3 +52,13 @@ os.environ.setdefault("DATABASE__MAX_OVERFLOW", "10")
 os.environ.setdefault("DATABASE__POOL_TIMEOUT", "30")
 os.environ.setdefault("DATABASE__POOL_RECYCLE", "3600")
 os.environ.setdefault("DATABASE__ECHO", "false")
+os.environ.setdefault("DATABASE__REQUIRE_SSL", "true")
+os.environ.setdefault(
+    "DATABASE__ENCRYPTION_KEY",
+    "8ZUJoRb_GXBDTPjL_Q0msBmE0vpo-hDabEIUkfGfs04=",
+)
+os.environ.setdefault(
+    "DATABASE__AUDIT_ENCRYPTION_KEY",
+    "oh-tvfXPINv_kIWFlUufdfrwqcoYlEtp6SuMziSRVLI=",
+)
+os.environ.setdefault("DATABASE__QUERY_TIMEOUT", "30")
