@@ -13,7 +13,6 @@ from pydantic import (
     Field,
     PostgresDsn,
     ValidationError,
-    validator,
     field_validator,
 )
 from pydantic_settings import (
@@ -65,10 +64,9 @@ class BatchSettings(BaseModel):
     enabled: bool = Field(False)
     multicall_address: str | None = None
 
-    @validator("multicall_address")
-    def check_multicall(
-        cls, value: str | None
-    ) -> str | None:  # noqa: D417
+    @field_validator("multicall_address", mode="before")
+    @classmethod
+    def check_multicall(cls, value: str | None) -> str | None:  # noqa: D417
         if value and not Web3.is_address(value):
             raise ValueError("invalid address")
         return Web3.to_checksum_address(value) if value else None
@@ -172,7 +170,7 @@ class AppConfig(BaseSettings):
 
         return init_settings, load_env, dotenv_settings, file_secret_settings
 
-    @validator(
+    @field_validator(
         "wallet_address",
         "token0_address",
         "token1_address",
@@ -182,7 +180,9 @@ class AppConfig(BaseSettings):
         "uniswap_v3_router",
         "curve_pool",
         "balancer_vault",
+        mode="before",
     )
+    @classmethod
     def check_address(cls, value: str) -> str:  # noqa: D417
         if not Web3.is_address(value):
             raise ValueError("invalid address")
