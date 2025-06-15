@@ -24,6 +24,10 @@ class RiskModelError(Exception):
     """Raised when risk scoring fails."""
 
 
+class ComplianceError(Exception):
+    """Raised when a request does not pass compliance checks."""
+
+
 @dataclass
 class AsyncFinancialTransactionValidator:
     """Validate trade requests using an external risk model."""
@@ -34,6 +38,26 @@ class AsyncFinancialTransactionValidator:
 
     def __post_init__(self) -> None:
         self._sem = asyncio.BoundedSemaphore(self.max_concurrent)
+
+    async def check_compliance(self, request: EnhancedTradeRequest) -> None:
+        """Ensure ``request`` originates from a compliant user."""
+        url = os.getenv("COMPLIANCE_API_URL")
+        if not url:
+            raise ComplianceError("missing compliance url")
+        user = (request.metadata or {}).get("user")
+        if not user or not str(user).isalnum():
+            raise ComplianceError("invalid user")
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            resp = await retry_async(
+                client.get,
+                url,
+                params={"user": user},
+                retries=3,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+        if not bool(data.get("kyc_passed")):
+            raise ComplianceError("kyc failed")
 
     async def score_risk(self, request: EnhancedTradeRequest) -> float:
         """Return a risk score for ``request`` between 0 and 1."""
@@ -52,6 +76,17 @@ class AsyncFinancialTransactionValidator:
         if not isinstance(request, EnhancedTradeRequest):
             raise ValidationError("invalid request type")
         async with self._sem:
+            try:
+                await asyncio.wait_for(
+                    retry_async(self.check_compliance, request, retries=3),
+                    timeout=self.timeout,
+                )
+            except asyncio.TimeoutError as exc:
+                logger.error("Compliance check timed out: %s", exc)
+                raise ComplianceError("timeout") from exc
+            except Exception as exc:  # noqa: BLE001
+                logger.error("Compliance check failed: %s", exc)
+                raise ComplianceError(str(exc)) from exc
             try:
                 score = await asyncio.wait_for(
                     retry_async(self.score_risk, request, retries=3),
