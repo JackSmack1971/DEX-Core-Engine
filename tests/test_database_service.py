@@ -22,7 +22,10 @@ async def test_get_session(monkeypatch):
         "database.services.database.create_async_engine", fake_engine
     )
     settings = DatabaseSettings(
-        url="postgresql+asyncpg://user:pass@localhost/test"
+        url="postgresql+asyncpg://user:pass@localhost/test",
+        encryption_key="8ZUJoRb_GXBDTPjL_Q0msBmE0vpo-hDabEIUkfGfs04=",
+        audit_encryption_key="oh-tvfXPINv_kIWFlUufdfrwqcoYlEtp6SuMziSRVLI=",
+        query_timeout=30,
     )
     service = DatabaseService(settings)
     start_checks = DB_HEALTH_CHECKS._value.get()
@@ -47,7 +50,10 @@ async def test_trade_repository_record_and_get(monkeypatch):
         "database.services.database.create_async_engine", fake_engine
     )
     settings = DatabaseSettings(
-        url="postgresql+asyncpg://user:pass@localhost/test"
+        url="postgresql+asyncpg://user:pass@localhost/test",
+        encryption_key="8ZUJoRb_GXBDTPjL_Q0msBmE0vpo-hDabEIUkfGfs04=",
+        audit_encryption_key="oh-tvfXPINv_kIWFlUufdfrwqcoYlEtp6SuMziSRVLI=",
+        query_timeout=30,
     )
     service = DatabaseService(settings)
     async with service.transaction() as session:
