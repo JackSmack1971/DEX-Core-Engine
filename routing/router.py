@@ -9,6 +9,7 @@ import os
 
 from dex_protocols.base import BaseDEXProtocol
 from exceptions import DexError, PriceManipulationError
+from models.trade_requests import EnhancedTradeRequest
 import config
 from slippage_protection import (
     SlippageParams,
@@ -226,3 +227,8 @@ class Router:
                 remaining -= part
             amt = int(total_out)
         return tx
+
+    async def execute_trade(self, req: "EnhancedTradeRequest") -> str:
+        """Execute a trade from a validated request."""
+        token_in, token_out = req.token_pair
+        return await self.execute_swap(int(req.amount), token_in, token_out)

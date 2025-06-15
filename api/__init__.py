@@ -21,6 +21,7 @@ from slowapi.util import get_remote_address
 
 from analytics import ReportingError, generate_report
 from exceptions import AnalyticsAPIError, BaseAppError, RateLimitError
+from models.trade_requests import EnhancedTradeRequest
 from logger import get_logger
 from middleware.rate_limiter import RateLimiterMiddleware
 from risk_manager import RiskManager
@@ -161,6 +162,19 @@ async def analytics_performance(
     except Exception as exc:  # noqa: BLE001
         logger.error("Performance calculation failed: %s", exc)
         raise HTTPException(500, "Performance calculation failed") from exc
+
+
+@app.post("/trade")
+async def trade_endpoint(
+    req: EnhancedTradeRequest,
+    current_user: TokenData = Security(get_current_user, scopes=["trader"]),
+) -> dict[str, str | tuple[str, str]]:
+    """Validate and acknowledge trade requests."""
+    logger.info(
+        "Trade request received from %s", current_user.username,
+        extra={"token_pair": req.token_pair, "amount": req.amount},
+    )
+    return {"status": "accepted", "token_pair": req.token_pair}
 
 
 @app.post("/admin/shutdown")
