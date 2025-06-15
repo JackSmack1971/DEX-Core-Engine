@@ -41,7 +41,7 @@ DEX-Core-Engine is a modular Ethereum trading bot focused on decentralized excha
    source venv/bin/activate  # Windows: venv\Scripts\activate
    pip install -r requirements.txt
    ```
-   Python 3.9 or newer is required.
+   Python 3.11 or newer is required.
 
 ## Environment Configuration
 All configuration is provided through environment variables. Copy `.env.example` and adjust values, then set additional variables as needed:
